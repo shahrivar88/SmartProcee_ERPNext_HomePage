@@ -17,7 +17,7 @@ LABELS = {
     "Selling": "فروش", "Support": "پشتیبانی", "Share Management": "مدیریت سهام",
     "Subscription": "اشتراک‌ها", "My Workspaces": "فضاهای کاری من",
     "rounded": "گوشه‌گرد", "circle": "دایره", "square": "مربع",
-    "small": "کوچک", "medium": "متوسط", "large": "بزرگ",
+    "small": "کوچک", "medium": "متوسط", "large": "بزرگ", "xlarge": "خیلی بزرگ",
     "Solid": "پررنگ", "Subtle": "ملایم", "Edit Layout": "ویرایش چیدمان",
     "Reset Layout": "بازنشانی چیدمان", "Edit Profile": "ویرایش نمایه",
     "Toggle Theme": "تغییر پوسته", "About": "درباره سامانه",

@@ -27,7 +27,7 @@ class SPHomeManager {
 	setup_actions() {
 		this.page.set_primary_action(__("ذخیره و اعمال"), () => this.save());
 		this.page.set_secondary_action(__("رفتن به صفحه اصلی"), () => {
-			window.location.href = "/desk";
+			window.open("/desk", "_blank", "noopener");
 		});
 		this.page.add_inner_button(__("آیکون جدید"), () => this.prompt_new_icon());
 		this.page.add_inner_button(__("دسته جدید"), () => this.prompt_new_category());
@@ -74,6 +74,7 @@ class SPHomeManager {
 						<option value="small">کوچک</option>
 						<option value="medium">متوسط</option>
 						<option value="large">بزرگ</option>
+						<option value="xlarge">خیلی بزرگ</option>
 					</select>
 				</label>
 				<label>
@@ -89,11 +90,11 @@ class SPHomeManager {
 				</label>
 				<label>
 					فاصله افقی
-					<input type="number" min="0" max="80" data-field="gap_x">
+					<input type="number" min="-50" max="100" step="1" data-field="gap_x">
 				</label>
 				<label>
 					فاصله عمودی
-					<input type="number" min="0" max="80" data-field="gap_y">
+					<input type="number" min="-50" max="100" step="1" data-field="gap_y">
 				</label>
 			</div>
 			<div class="sp-home-hint">این پیش‌نمایش اندازه، شکل و فاصله‌ها را نشان می‌دهد. تنظیم اختصاصی هر آیکون حفظ می‌شود. دستهٔ خالی پس از ذخیره باقی نمی‌ماند؛ ابتدا آیکونی به آن منتقل کنید.</div>
@@ -116,7 +117,7 @@ class SPHomeManager {
 			if (field === "gap_x" || field === "gap_y") {
 				let gap = parseInt($el.val(), 10);
 				if (Number.isNaN(gap)) gap = 8;
-				gap = Math.min(80, Math.max(0, gap));
+				gap = Math.min(100, Math.max(-50, gap));
 				this.state[field] = gap;
 				$el.val(gap);
 				this.update_preview();
@@ -148,10 +149,16 @@ class SPHomeManager {
 		root.style.setProperty("--sp-cols", this.state.columns ?? 5);
 		root.style.setProperty("--sp-gap-x", `${this.state.gap_x ?? 8}px`);
 		root.style.setProperty("--sp-gap-y", `${this.state.gap_y ?? 8}px`);
+		this.$root.find(".sp-home-cards").each((_, grid) => {
+			[...grid.querySelectorAll(":scope > .sp-home-card")].forEach((card, index) => {
+				card.style.setProperty("--sp-col", index % (this.state.columns ?? 5));
+				card.style.setProperty("--sp-row", Math.floor(index / (this.state.columns ?? 5)));
+			});
+		});
 	}
 
 	render_category(category) {
-		const items = this.state.items.filter((item) => (item.category || "عمومی") === category);
+		const items = this.state.items.filter((item) => !item.hidden && item.icon_type !== "Folder" && (item.category || "عمومی") === category);
 		const $section = $(`
 			<section class="sp-home-category" data-category="${frappe.utils.escape_html(category)}">
 				<header>
@@ -189,6 +196,7 @@ class SPHomeManager {
 		const size = this.effective_size(item);
 		const $card = $(`
 			<article class="sp-home-card ${item.hidden ? "is-hidden" : ""}" data-name="${frappe.utils.escape_html(item.name)}" data-shape="${shape}" data-size="${size}">
+				<button class="sp-home-delete" type="button" title="حذف آیکون" aria-label="حذف آیکون">×</button>
 				<div class="sp-home-card-icon" style="${/^#[\da-f]{3}([\da-f]{3})?$/i.test(item.custom_color || "") ? `background:${item.custom_color}` : ""}">
 					${image ? `<img src="${frappe.utils.escape_html(image)}" alt="${frappe.utils.escape_html(label)}">` : `<span>${frappe.utils.escape_html((label || "؟").slice(0, 1))}</span>`}
 				</div>
@@ -197,6 +205,13 @@ class SPHomeManager {
 			</article>
 		`);
 		$card.on("click", () => this.edit_item(item));
+		$card.find(".sp-home-delete").on("click", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			item.hidden = 1;
+			this.empty_categories = this.empty_categories.filter(category => category !== (item.category || "عمومی"));
+			this.render();
+		});
 		return $card;
 	}
 
@@ -254,7 +269,7 @@ class SPHomeManager {
 					fieldname: "size",
 					fieldtype: "Select",
 					label: __("اندازه"),
-					options: [{value: "small", label: "کوچک"}, {value: "medium", label: "متوسط"}, {value: "large", label: "بزرگ"}],
+					options: [{value: "small", label: "کوچک"}, {value: "medium", label: "متوسط"}, {value: "large", label: "بزرگ"}, {value: "xlarge", label: "خیلی بزرگ"}],
 					default: this.effective_size(item),
 				},
 				{ fieldname: "use_custom_style", fieldtype: "Check", label: "شکل و اندازهٔ اختصاصی", default: item.use_custom_style },
@@ -316,7 +331,7 @@ class SPHomeManager {
 
 	get_categories() {
 		const seen = [...this.empty_categories];
-		(this.state.items || []).forEach((item) => {
+		(this.state.items || []).filter(item => !item.hidden && item.icon_type !== "Folder").forEach((item) => {
 			const category = item.category || "عمومی";
 			if (!seen.includes(category)) seen.push(category);
 		});
@@ -328,9 +343,10 @@ class SPHomeManager {
 		// Read live controls as well: Save may precede a number input's blur/change.
 		for (const field of ["columns", "gap_x", "gap_y"]) {
 			const value = Number(this.$root.find(`[data-field=${field}]`).val());
-			this.state[field] = Number.isFinite(value) ? Math.max(field === "columns" ? 2 : 0, Math.min(field === "columns" ? 10 : 80, Math.trunc(value))) : (field === "columns" ? 5 : 8);
+			this.state[field] = Number.isFinite(value) ? Math.max(field === "columns" ? 2 : -50, Math.min(field === "columns" ? 10 : 100, Math.trunc(value))) : (field === "columns" ? 5 : 8);
 		}
 		this.sync_from_dom();
+		this.empty_categories = [];
 		const payload = {
 			enable_custom_styles: this.state.enabled ? 1 : 0,
 			apply_to_all_users: this.state.apply_to_all_users ? 1 : 0,

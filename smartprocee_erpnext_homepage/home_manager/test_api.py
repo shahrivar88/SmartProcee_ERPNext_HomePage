@@ -21,7 +21,7 @@ class TestHomeLayout(unittest.TestCase):
         frappe.set_user(self.user)
 
     def test_round_trip(self):
-        for columns, gap_x, gap_y, size, shape in [(3, 0, 30, "small", "circle"), (5, 30, 0, "medium", "square"), (7, 8, 8, "large", "rounded")]:
+        for columns, gap_x, gap_y, size, shape in [(3, -50, 100, "small", "circle"), (5, 30, 0, "medium", "square"), (7, 8, 8, "large", "rounded"), (6, -25, -10, "xlarge", "square")]:
             payload = copy.deepcopy(self.layout)
             payload.update(columns=columns, gap_x=gap_x, gap_y=gap_y, default_size=size, default_shape=shape)
             with patch.object(frappe, "publish_realtime") as publish:
@@ -56,6 +56,11 @@ class TestHomeLayout(unittest.TestCase):
         frappe.set_user("Guest")
         with self.assertRaises(frappe.PermissionError):
             api.get_layout()
+
+    def test_folders_are_not_returned(self):
+        layout = api.get_layout()
+        self.assertTrue(layout["items"])
+        self.assertFalse(any(item["icon_type"] == "Folder" for item in layout["items"]))
 
 
 def run_checks():

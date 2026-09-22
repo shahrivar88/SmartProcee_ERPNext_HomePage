@@ -1,5 +1,5 @@
 (() => {
-	const SP_HOME_VERSION = "12";
+	const SP_HOME_VERSION = "13";
 	try {
 		if (localStorage.getItem("sp_home_version") !== SP_HOME_VERSION) {
 			localStorage.removeItem("_page:home-manager");
@@ -33,6 +33,7 @@
 			const settings = new Map((layout.items || []).flatMap(item => [[item.name, item], [item.label, item]]));
 			base.forEach(icon => {
 				const item = settings.get(icon.name) || settings.get(icon.label);
+				if (icon.icon_type === "Folder") icon.hidden = 1;
 				if (item) {
 					icon.hidden = Number(item.hidden) ? 1 : 0;
 					// Render the same flat list as the settings page without changing Desktop Icon records.
@@ -89,6 +90,10 @@
 		}
 		if (img) img.alt = label;
 		el.setAttribute("aria-label", label);
+		if (item.link === "/app/home-manager" || item.name === "مدیریت صفحه اصلی") {
+			el.target = "_blank";
+			el.rel = "noopener";
+		}
 	};
 	const add_runtime_icons = (grid, layout) => {
 		const existing = new Set([...grid.querySelectorAll(":scope > a.desktop-icon")].map(el => el.dataset.id));
@@ -135,8 +140,8 @@
 				document.querySelectorAll(".sp-home-manage-btn").forEach(el => el.remove());
 				return true;
 			}
-			container.style.setProperty("--sp-gap-x", `${clamp(layout.gap_x, 0, 80, 8)}px`);
-			container.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, 0, 80, 8)}px`);
+			container.style.setProperty("--sp-gap-x", `${clamp(layout.gap_x, -50, 100, 8)}px`);
+			container.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, -50, 100, 8)}px`);
 			container.style.setProperty("--sp-cols", clamp(layout.columns, 2, 10, 5));
 			const items = new Map((layout.items || []).flatMap(item => [[item.name, item], [item.label, item]]));
 			add_runtime_icons(grid, layout);
@@ -158,6 +163,10 @@
 				const heading = document.createElement("h2");
 				heading.className = "sp-home-section-title";
 				heading.textContent = category;
+				members.forEach((member, index) => {
+					member.style.setProperty("--sp-col", index % clamp(layout.columns, 2, 10, 5));
+					member.style.setProperty("--sp-row", Math.floor(index / clamp(layout.columns, 2, 10, 5)));
+				});
 				section.append(heading, ...members);
 				grid.append(section);
 			});
@@ -165,11 +174,11 @@
 			document.querySelectorAll(".desktop-modal-body > .icons-container > .icons").forEach(modalGrid => {
 				modalGrid.classList.add("sp-home-modal-grid");
 				modalGrid.style.setProperty("--sp-cols", clamp(layout.columns, 2, 10, 5));
-				modalGrid.style.setProperty("--sp-gap-x", `${clamp(layout.gap_x, 0, 80, 8)}px`);
-				modalGrid.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, 0, 80, 8)}px`);
+				modalGrid.style.setProperty("--sp-gap-x", `${clamp(layout.gap_x, -50, 100, 8)}px`);
+				modalGrid.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, -50, 100, 8)}px`);
 				modalGrid.querySelectorAll(":scope > .desktop-icon").forEach(el => apply_icon_style(el, items.get(el.dataset.id) || {label: el.dataset.id}, layout));
 			});
-			if (has_manager_role() && !document.querySelector(".sp-home-manage-btn")) $("<a class='sp-home-manage-btn' href='/app/home-manager'>مدیریت صفحه اصلی</a>").appendTo(container.closest(".desktop-wrapper"));
+			if (has_manager_role() && !document.querySelector(".sp-home-manage-btn")) $("<a class='sp-home-manage-btn' href='/app/home-manager' target='_blank' rel='noopener' title='مدیریت صفحه اصلی' aria-label='مدیریت صفحه اصلی'>⚙</a>").appendTo(container.closest(".desktop-wrapper"));
 			return true;
 		} finally { applying = false; observe(); }
 	};

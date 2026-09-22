@@ -46,7 +46,7 @@
    "fieldname": "default_size",
    "fieldtype": "Select",
    "label": "اندازه پیش‌فرض",
-   "options": "small\nmedium\nlarge"
+   "options": "small\nmedium\nlarge\nxlarge"
   },
   {
    "default": "Solid",

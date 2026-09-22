@@ -44,6 +44,8 @@ def get_boot_layout():
 
 	items = []
 	for icon in icons:
+		if icon.icon_type == "Folder":
+			continue
 		style = style_map.get(icon.name) or style_map.get(icon.label)
 		use_custom = cint(style.get("use_custom_style")) if style else 0
 		items.append(
@@ -235,10 +237,10 @@ def _clamp_gap(value, default):
 	number = cint(value)
 	if value in (None, "") and not number:
 		number = default
-	if number < 0:
-		return 0
-	if number > 80:
-		return 80
+	if number < -50:
+		return -50
+	if number > 100:
+		return 100
 	return number
 
 
@@ -254,7 +256,7 @@ def _parse_payload(payload):
 
 
 def _validate_style(shape, size, icon_style="Solid"):
-	if shape not in ("rounded", "circle", "square") or size not in ("small", "medium", "large") or icon_style not in ("Solid", "Subtle"):
+	if shape not in ("rounded", "circle", "square") or size not in ("small", "medium", "large", "xlarge") or icon_style not in ("Solid", "Subtle"):
 		frappe.throw("شکل، اندازه یا سبک آیکون معتبر نیست.")
 
 

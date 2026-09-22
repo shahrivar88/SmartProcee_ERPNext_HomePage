@@ -55,7 +55,7 @@
    "fieldname": "size",
    "fieldtype": "Select",
    "label": "اندازه",
-   "options": "small\nmedium\nlarge"
+   "options": "small\nmedium\nlarge\nxlarge"
   },
   {
    "default": "0",

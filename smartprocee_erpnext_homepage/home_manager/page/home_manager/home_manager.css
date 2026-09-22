@@ -70,23 +70,41 @@
 
 .sp-home-cards {
 	display: grid;
-	width: calc(var(--sp-cols) * 140px + (var(--sp-cols) - 1) * var(--sp-gap-x));
+	width: calc(var(--sp-cols) * 140px + (var(--sp-cols) - 1) * max(0px, var(--sp-gap-x)));
 	max-width: 100%;
 	margin-inline: auto;
 	grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 140px));
 	justify-content: center;
-	column-gap: var(--sp-gap-x);
-	row-gap: var(--sp-gap-y);
+	column-gap: max(0px, var(--sp-gap-x));
+	row-gap: max(0px, var(--sp-gap-y));
 	min-height: 132px;
 }
 
 .sp-home-card {
+	position: relative;
+	translate: calc(-1 * var(--sp-col, 0) * min(0px, var(--sp-gap-x))) calc(var(--sp-row, 0) * min(0px, var(--sp-gap-y)));
 	border: 1px solid var(--border-color);
 	border-radius: 14px;
 	padding: 12px 8px;
 	text-align: center;
 	cursor: pointer;
 	background: var(--bg-color);
+}
+
+.sp-home-delete {
+	position: absolute;
+	top: 5px;
+	left: 5px;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--red-500) 35%, transparent);
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--red-500) 12%, transparent);
+	color: var(--red-600);
+	font-size: 18px;
+	line-height: 20px;
+	z-index: 2;
 }
 
 .sp-home-card.is-hidden {
@@ -122,6 +140,11 @@
 .sp-home-card[data-size="large"] .sp-home-card-icon {
 	width: 64px;
 	height: 64px;
+}
+
+.sp-home-card[data-size="xlarge"] .sp-home-card-icon {
+	width: 84px;
+	height: 84px;
 }
 
 .sp-home-card-icon img {
