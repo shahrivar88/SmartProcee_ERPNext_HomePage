@@ -13,6 +13,8 @@
   "size",
   "use_custom_style",
   "custom_color",
+  "custom_link",
+  "custom_icon_image",
   "hidden",
   "sequence"
  ],
@@ -67,6 +69,16 @@
    "fieldname": "custom_color",
    "fieldtype": "Color",
    "label": "رنگ"
+  },
+  {
+   "fieldname": "custom_link",
+   "fieldtype": "Data",
+   "label": "لینک"
+  },
+  {
+   "fieldname": "custom_icon_image",
+   "fieldtype": "Attach Image",
+   "label": "تصویر آیکون"
   },
   {
    "default": "0",

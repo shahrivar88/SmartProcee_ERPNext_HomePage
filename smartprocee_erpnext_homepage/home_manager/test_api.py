@@ -43,6 +43,32 @@ class TestHomeLayout(unittest.TestCase):
         saved = next(row for row in result["items"] if row["name"] == item["name"])
         self.assertEqual((saved["size"], saved["shape"], saved["custom_color"]), ("small", "circle", "#123456"))
 
+    def test_custom_link_survives_round_trip(self):
+        payload = copy.deepcopy(self.layout)
+        item = payload["items"][0]
+        item["custom_link"] = "/app/user"
+        with patch.object(frappe, "publish_realtime"):
+            result = api.save_layout(payload)
+        saved = next(row for row in result["items"] if row["name"] == item["name"])
+        self.assertEqual(saved["custom_link"], "/app/user")
+
+    def test_uploaded_image_survives_round_trip(self):
+        file_url = "/files/sp-home-test-icon.png"
+        payload = copy.deepcopy(self.layout)
+        item = payload["items"][0]
+        item["custom_icon_image"] = file_url
+        original_exists = frappe.db.exists
+
+        def exists(doctype, filters, *args, **kwargs):
+            if doctype == "File" and filters == {"file_url": file_url}:
+                return True
+            return original_exists(doctype, filters, *args, **kwargs)
+
+        with patch.object(frappe.db, "exists", side_effect=exists), patch.object(frappe, "publish_realtime"):
+            result = api.save_layout(payload)
+        saved = next(row for row in result["items"] if row["name"] == item["name"])
+        self.assertEqual(saved["custom_icon_image"], file_url)
+
     def test_reject_invalid_input(self):
         for changes in [{"default_shape": "invalid"}, {"default_size": "invalid"}, {"icon_style": "invalid"}]:
             payload = copy.deepcopy(self.layout)
@@ -51,6 +77,14 @@ class TestHomeLayout(unittest.TestCase):
                 api.save_layout(payload)
         with self.assertRaises(frappe.ValidationError):
             api.save_layout("not json")
+        unsafe_link = copy.deepcopy(self.layout)
+        unsafe_link["items"][0]["custom_link"] = "javascript:alert(1)"
+        with self.assertRaises(frappe.ValidationError):
+            api.save_layout(unsafe_link)
+        unsafe_image = copy.deepcopy(self.layout)
+        unsafe_image["items"][0]["custom_icon_image"] = "https://example.com/icon.png"
+        with self.assertRaises(frappe.ValidationError):
+            api.save_layout(unsafe_image)
 
     def test_manager_permission(self):
         frappe.set_user("Guest")

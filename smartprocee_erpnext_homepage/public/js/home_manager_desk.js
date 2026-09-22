@@ -1,5 +1,5 @@
 (() => {
-	const SP_HOME_VERSION = "14";
+	const SP_HOME_VERSION = "15";
 	try {
 		if (localStorage.getItem("sp_home_version") !== SP_HOME_VERSION) {
 			localStorage.removeItem("_page:home-manager");
@@ -47,13 +47,14 @@
 	const remember = el => {
 		if (originals.has(el)) return;
 		const box = el.querySelector(":scope > .icon-container");
-		originals.set(el, { src: box?.querySelector(":scope > img")?.getAttribute("src"), caption: el.querySelector(":scope > .icon-caption")?.innerHTML });
+		originals.set(el, { src: box?.querySelector(":scope > img")?.getAttribute("src"), href: el.getAttribute("href"), caption: el.querySelector(":scope > .icon-caption")?.innerHTML });
 	};
 	const restore = el => {
 		const original = originals.get(el);
 		if (!original) return;
 		const img = el.querySelector(":scope > .icon-container > img");
 		if (img && original.src) img.setAttribute("src", original.src);
+		if (original.href) el.setAttribute("href", original.href);
 		const caption = el.querySelector(":scope > .icon-caption");
 		if (caption && original.caption !== undefined) caption.innerHTML = original.caption;
 		el.classList.remove("sp-home-icon");
@@ -71,9 +72,10 @@
 		const img = el.querySelector(":scope > .icon-container > img.app-icon");
 		const box = el.querySelector(":scope > .icon-container");
 		if (img && item.icon_type !== "Folder") {
-			const url = frappe.utils.get_desktop_icon?.(item.label || item.name, (layout.icon_style || "Solid").toLowerCase());
+			const url = item.custom_icon_image || frappe.utils.get_desktop_icon?.(item.label || item.name, (layout.icon_style || "Solid").toLowerCase());
 			if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
 		}
+		if (item.custom_link) el.setAttribute("href", item.custom_link);
 		if (/^#[\da-f]{3}([\da-f]{3})?$/i.test(item.custom_color || "")) el.style.setProperty("--sp-home-color", item.custom_color);
 		else el.style.removeProperty("--sp-home-color");
 		const caption = el.querySelector(":scope > .icon-caption > .icon-title");

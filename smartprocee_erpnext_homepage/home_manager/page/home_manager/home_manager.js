@@ -170,7 +170,7 @@ class SPHomeManager {
 		`);
 		const $cards = $section.find(".sp-home-cards");
 		items.forEach((item) => $cards.append(this.render_card(item)));
-		const rename = () => {
+		const rename = (rerender = true) => {
 			const next = ($section.find(".sp-category-title").val() || "").trim();
 			if (!next) {
 				$section.find(".sp-category-title").val(category);
@@ -181,13 +181,15 @@ class SPHomeManager {
 				if (item.category === category) item.category = next;
 			});
 			this.empty_categories = this.empty_categories.map(name => name === category ? next : name);
-			this.render();
+			$section.attr("data-category", next);
+			if (rerender) this.render();
 		};
-		$section.find(".sp-rename-cat").on("click", rename);
+		$section.find(".sp-rename-cat").on("click", () => rename(true));
+		$section.find(".sp-category-title").on("change", () => rename(false));
 		$section.find(".sp-category-title").on("keydown", event => {
 			if (event.key === "Enter") {
 				event.preventDefault();
-				rename();
+				rename(true);
 			}
 		});
 		return $section;
@@ -203,7 +205,7 @@ class SPHomeManager {
 
 	render_card(item) {
 		const label = __(item.custom_label || item.label);
-		const image = item.icon_type !== "Folder" && (frappe.utils.get_desktop_icon?.(item.label, (this.state.icon_style || "Solid").toLowerCase()) || item.icon_image || item.logo_url);
+		const image = item.icon_type !== "Folder" && (item.custom_icon_image || frappe.utils.get_desktop_icon?.(item.label, (this.state.icon_style || "Solid").toLowerCase()) || item.icon_image || item.logo_url);
 		const shape = this.effective_shape(item);
 		const size = this.effective_size(item);
 		const $card = $(`
@@ -271,6 +273,20 @@ class SPHomeManager {
 					default: item.category || "عمومی",
 				},
 				{
+					fieldname: "custom_link",
+					fieldtype: "Data",
+					label: __("لینک"),
+					default: item.custom_link || item.link || (item.link_to ? `/app/${frappe.router.slug(item.link_to)}` : ""),
+					description: __("برای حفظ لینک فعلی تغییری ندهید."),
+				},
+				{
+					fieldname: "custom_icon_image",
+					fieldtype: "Attach Image",
+					label: __("انتخاب یا بارگذاری تصویر آیکون"),
+					default: item.custom_icon_image || "",
+					description: __("یک تصویر را از رایانه بارگذاری کنید یا از فایل‌های سامانه انتخاب کنید."),
+				},
+				{
 					fieldname: "shape",
 					fieldtype: "Select",
 					label: __("شکل"),
@@ -290,7 +306,7 @@ class SPHomeManager {
 			],
 			primary_action_label: __("اعمال روی کارت"),
 			primary_action: (values) => {
-								Object.assign(item, values);
+				Object.assign(item, values);
 				item.hidden = values.hidden ? 1 : 0;
 				item.use_custom_style = values.use_custom_style ? 1 : 0;
 				dialog.hide();

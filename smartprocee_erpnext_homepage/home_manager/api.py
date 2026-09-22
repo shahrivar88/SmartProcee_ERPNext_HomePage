@@ -58,6 +58,8 @@ def get_boot_layout():
 				"size": style.size if use_custom and style and style.size else (settings.default_size or "medium"),
 				"use_custom_style": use_custom,
 				"custom_color": style.custom_color if style else "",
+				"custom_link": style.custom_link if style else "",
+				"custom_icon_image": style.custom_icon_image if style else "",
 				"hidden": cint(style.hidden) if style else cint(icon.hidden),
 				"sequence": cint(style.sequence) if style and style.sequence else cint(icon.idx),
 				"icon_type": icon.icon_type,
@@ -130,6 +132,10 @@ def save_layout(payload=None):
 		color = item.get("custom_color") or ""
 		if color and not re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", color):
 			frappe.throw("رنگ باید یک کد معتبر سه یا شش رقمی با علامت # باشد.")
+		custom_link = (item.get("custom_link") or "").strip()
+		custom_icon_image = (item.get("custom_icon_image") or "").strip()
+		_validate_link(custom_link)
+		_validate_uploaded_image(custom_icon_image)
 		settings.append(
 			"styles",
 			{
@@ -140,6 +146,8 @@ def save_layout(payload=None):
 				"size": item.get("size") or settings.default_size,
 				"use_custom_style": cint(item.get("use_custom_style")),
 				"custom_color": item.get("custom_color") or "",
+				"custom_link": custom_link,
+				"custom_icon_image": custom_icon_image,
 				"hidden": hidden,
 				"sequence": sequence,
 			},
@@ -259,6 +267,22 @@ def _parse_payload(payload):
 def _validate_style(shape, size, icon_style="Solid"):
 	if shape not in ("rounded", "circle", "square") or size not in ("small", "medium", "large", "xlarge") or icon_style not in ("Solid", "Subtle"):
 		frappe.throw("شکل، اندازه یا سبک آیکون معتبر نیست.")
+
+
+def _validate_link(link):
+	if not link:
+		return
+	if len(link) > 1000 or not re.match(r"^(?:/|https?://|mailto:)", link, re.IGNORECASE):
+		frappe.throw("لینک باید داخلی یا با http، https یا mailto آغاز شود.")
+
+
+def _validate_uploaded_image(file_url):
+	if not file_url:
+		return
+	if len(file_url) > 1000 or not re.match(r"^/(?:private/)?files/", file_url, re.IGNORECASE):
+		frappe.throw("تصویر آیکون باید از ابزار بارگذاری همین سامانه انتخاب شود.")
+	if not frappe.db.exists("File", {"file_url": file_url}):
+		frappe.throw("فایل تصویر انتخاب‌شده در سامانه پیدا نشد.")
 
 
 def _clear_desktop_caches():

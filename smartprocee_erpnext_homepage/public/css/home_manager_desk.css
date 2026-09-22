@@ -64,9 +64,11 @@
 	padding: 0;
 	flex-shrink: 0;
 	border-radius: var(--sp-radius) !important;
+	clip-path: inset(0 round var(--sp-radius));
+	background-color: var(--sp-home-color, var(--control-bg)) !important;
 	transform: none;
 }
-:is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .icon-container > img.app-icon { width: 100%; height: 100%; object-fit: contain; border-radius: inherit !important; }
+:is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .icon-container > img.app-icon { width: 100%; height: 100%; object-fit: contain; border-radius: var(--sp-radius) !important; clip-path: inset(0 round var(--sp-radius)); }
 :is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .icon-container > svg { width: 60%; height: 60%; color: inherit; }
 :is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .icon-container:not(:has(img)):not(.folder-icon) { background: var(--sp-home-color, #0289f7); color: white; }
 :is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon[data-sp-style="Subtle"] > .icon-container:not(:has(img)):not(.folder-icon) { background: color-mix(in srgb, var(--sp-home-color, #0289f7) 12%, var(--fg-color)); color: var(--sp-home-color, #0289f7); }
