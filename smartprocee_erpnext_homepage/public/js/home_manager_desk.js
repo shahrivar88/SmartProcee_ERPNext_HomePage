@@ -1,5 +1,5 @@
 (() => {
-	const SP_HOME_VERSION = "15";
+	const SP_HOME_VERSION = "16";
 	try {
 		if (localStorage.getItem("sp_home_version") !== SP_HOME_VERSION) {
 			localStorage.removeItem("_page:home-manager");
@@ -76,6 +76,8 @@
 			if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
 		}
 		if (item.custom_link) el.setAttribute("href", item.custom_link);
+		el.target = "_blank";
+		el.rel = "noopener";
 		if (/^#[\da-f]{3}([\da-f]{3})?$/i.test(item.custom_color || "")) el.style.setProperty("--sp-home-color", item.custom_color);
 		else el.style.removeProperty("--sp-home-color");
 		const caption = el.querySelector(":scope > .icon-caption > .icon-title");
@@ -92,10 +94,6 @@
 		}
 		if (img) img.alt = label;
 		el.setAttribute("aria-label", label);
-		if (item.link === "/app/home-manager" || item.name === "مدیریت صفحه اصلی") {
-			el.target = "_blank";
-			el.rel = "noopener";
-		}
 	};
 	const add_runtime_icons = (grid, layout) => {
 		const existing = new Set([...grid.querySelectorAll(":scope > a.desktop-icon")].map(el => el.dataset.id));
@@ -107,6 +105,8 @@
 			el.dataset.id = item.name;
 			el.dataset.spRuntime = "1";
 			el.href = item.link || (item.link_to ? `/app/${frappe.router.slug(item.link_to)}` : "#");
+			el.target = "_blank";
+			el.rel = "noopener";
 			const box = el.querySelector(":scope > .icon-container");
 			if (box) box.innerHTML = `<span class="sp-home-letter">${frappe.utils.escape_html(label.slice(0, 1))}</span>`;
 			const title = el.querySelector(":scope > .icon-caption > .icon-title");
