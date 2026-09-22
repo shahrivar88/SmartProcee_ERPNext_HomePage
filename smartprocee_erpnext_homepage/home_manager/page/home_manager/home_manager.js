@@ -170,13 +170,25 @@ class SPHomeManager {
 		`);
 		const $cards = $section.find(".sp-home-cards");
 		items.forEach((item) => $cards.append(this.render_card(item)));
-		$section.find(".sp-rename-cat").on("click", () => {
+		const rename = () => {
 			const next = ($section.find(".sp-category-title").val() || "").trim();
-			if (!next || next === category) return;
+			if (!next) {
+				$section.find(".sp-category-title").val(category);
+				return;
+			}
+			if (next === category) return;
 			this.state.items.forEach((item) => {
 				if (item.category === category) item.category = next;
 			});
+			this.empty_categories = this.empty_categories.map(name => name === category ? next : name);
 			this.render();
+		};
+		$section.find(".sp-rename-cat").on("click", rename);
+		$section.find(".sp-category-title").on("keydown", event => {
+			if (event.key === "Enter") {
+				event.preventDefault();
+				rename();
+			}
 		});
 		return $section;
 	}
@@ -330,9 +342,12 @@ class SPHomeManager {
 	}
 
 	get_categories() {
-		const seen = [...this.empty_categories];
+		const seen = [];
 		(this.state.items || []).filter(item => !item.hidden && item.icon_type !== "Folder").forEach((item) => {
 			const category = item.category || "عمومی";
+			if (!seen.includes(category)) seen.push(category);
+		});
+		this.empty_categories.forEach(category => {
 			if (!seen.includes(category)) seen.push(category);
 		});
 		if (!seen.length) seen.push("عمومی");

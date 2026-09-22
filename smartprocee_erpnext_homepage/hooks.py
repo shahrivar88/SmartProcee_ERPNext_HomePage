@@ -6,8 +6,8 @@ app_email = "info@smartprocess.local"
 app_license = "mit"
 required_apps = ["frappe"]
 
-app_include_js = ["/assets/smartprocee_erpnext_homepage/js/home_manager_desk.js?v=6"]
-app_include_css = ["/assets/smartprocee_erpnext_homepage/css/home_manager_desk.css?v=6"]
+app_include_js = ["/assets/smartprocee_erpnext_homepage/js/home_manager_desk.js?v=8"]
+app_include_css = ["/assets/smartprocee_erpnext_homepage/css/home_manager_desk.css?v=8"]
 boot_session = "smartprocee_erpnext_homepage.home_manager.boot.boot_session"
 after_install = "smartprocee_erpnext_homepage.home_manager.install.after_install"
 after_migrate = ["smartprocee_erpnext_homepage.home_manager.install.after_migrate"]

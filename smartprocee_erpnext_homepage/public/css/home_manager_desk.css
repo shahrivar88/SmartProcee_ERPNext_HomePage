@@ -74,8 +74,9 @@
 :is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .folder-icon { padding: 6px; --folder-thumbnail-icon-height: 12px; }
 :is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .icon-caption { display: block; width: 100%; height: auto; min-height: 40px; text-wrap: wrap; }
 :is(.sp-home-section, .sp-home-modal-grid) > .sp-home-icon > .icon-caption > .icon-title { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; overflow: visible; font-size: 12px; line-height: 1.7; }
-.sp-home-manage-btn { position: fixed; left: 20px; bottom: 20px; z-index: 1020; display: grid; place-items: center; width: 42px; height: 42px; background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent); border-radius: 50%; padding: 0; font-size: 21px; line-height: 1; box-shadow: var(--shadow-sm); backdrop-filter: blur(6px); }
-.sp-home-manage-btn:hover, .sp-home-manage-btn:focus-visible { color: white; text-decoration: none; outline: 2px solid var(--text-muted); outline-offset: 2px; }
+.sp-home-manage-btn { position: fixed; left: 20px; bottom: 20px; z-index: 1020; display: grid; place-items: center; width: 42px; height: 42px; background: transparent; color: var(--primary); border: 0; border-radius: 0; padding: 5px; opacity: .5; box-shadow: none; }
+.sp-home-manage-btn > svg { width: 100%; height: 100%; display: block; }
+.sp-home-manage-btn:hover, .sp-home-manage-btn:focus-visible { color: var(--primary); opacity: .9; text-decoration: none; outline: 0; transform: rotate(18deg) scale(1.06); }
 
 .sp-home-icon > .icon-container:has(.sp-home-letter) > svg.desktop-alphabet { display: none; }
 .sp-home-letter { font-size: calc(var(--sp-icon-size) * .48); font-weight: 600; }

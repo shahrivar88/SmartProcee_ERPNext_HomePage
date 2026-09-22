@@ -1,5 +1,5 @@
 (() => {
-	const SP_HOME_VERSION = "13";
+	const SP_HOME_VERSION = "14";
 	try {
 		if (localStorage.getItem("sp_home_version") !== SP_HOME_VERSION) {
 			localStorage.removeItem("_page:home-manager");
@@ -178,7 +178,7 @@
 				modalGrid.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, -50, 100, 8)}px`);
 				modalGrid.querySelectorAll(":scope > .desktop-icon").forEach(el => apply_icon_style(el, items.get(el.dataset.id) || {label: el.dataset.id}, layout));
 			});
-			if (has_manager_role() && !document.querySelector(".sp-home-manage-btn")) $("<a class='sp-home-manage-btn' href='/app/home-manager' target='_blank' rel='noopener' title='مدیریت صفحه اصلی' aria-label='مدیریت صفحه اصلی'>⚙</a>").appendTo(container.closest(".desktop-wrapper"));
+			if (has_manager_role() && !document.querySelector(".sp-home-manage-btn")) $("<a class='sp-home-manage-btn' href='/app/home-manager' target='_blank' rel='noopener' title='مدیریت صفحه اصلی' aria-label='مدیریت صفحه اصلی'><svg viewBox='0 0 24 24' aria-hidden='true'><path fill='currentColor' d='M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.1 7.1 0 0 0-1.62-.94L14.4 2.8a.48.48 0 0 0-.48-.4h-3.84a.48.48 0 0 0-.48.4l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.72 8.86a.48.48 0 0 0 .12.62l2.03 1.58c-.05.31-.08.64-.08.94s.03.63.08.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.22.38.31.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.23.24.4.48.4h3.84c.24 0 .44-.17.48-.4l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.02-1.58ZM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Z'/></svg></a>").appendTo(container.closest(".desktop-wrapper"));
 			return true;
 		} finally { applying = false; observe(); }
 	};

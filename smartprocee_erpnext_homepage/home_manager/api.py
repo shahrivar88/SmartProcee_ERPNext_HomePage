@@ -72,7 +72,8 @@ def get_boot_layout():
 			}
 		)
 
-	items.sort(key=lambda row: (row["category"], row["sequence"], row["label"]))
+	# Global sequence preserves the editor's category order; newly created categories stay last.
+	items.sort(key=lambda row: (row["sequence"], row["label"]))
 	return {
 		"enabled": cint(settings.enable_custom_styles),
 		"manager_only": not cint(settings.apply_to_all_users),

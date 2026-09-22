@@ -62,6 +62,18 @@ class TestHomeLayout(unittest.TestCase):
         self.assertTrue(layout["items"])
         self.assertFalse(any(item["icon_type"] == "Folder" for item in layout["items"]))
 
+    def test_new_category_stays_last(self):
+        payload = copy.deepcopy(self.layout)
+        moved = payload["items"][0]
+        moved.update(category="دسته تازه", sequence=9999)
+        with patch.object(frappe, "publish_realtime"):
+            result = api.save_layout(payload)
+        categories = []
+        for item in result["items"]:
+            if item["category"] not in categories:
+                categories.append(item["category"])
+        self.assertEqual(categories[-1], "دسته تازه")
+
 
 def run_checks():
     result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(TestHomeLayout))
