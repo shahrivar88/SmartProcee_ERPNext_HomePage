@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "creation": "2026-09-21 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "desktop_icon",
+  "custom_label",
+  "category",
+  "column_break_style",
+  "shape",
+  "size",
+  "use_custom_style",
+  "custom_color",
+  "hidden",
+  "sequence"
+ ],
+ "fields": [
+  {
+   "fieldname": "desktop_icon",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "آیکون صفحه اصلی",
+   "options": "Desktop Icon",
+   "reqd": 1
+  },
+  {
+   "fieldname": "custom_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "نام نمایشی"
+  },
+  {
+   "default": "عمومی",
+   "fieldname": "category",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "دسته"
+  },
+  {
+   "fieldname": "column_break_style",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "rounded",
+   "fieldname": "shape",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "شکل",
+   "options": "rounded\ncircle\nsquare"
+  },
+  {
+   "default": "medium",
+   "fieldname": "size",
+   "fieldtype": "Select",
+   "label": "اندازه",
+   "options": "small\nmedium\nlarge"
+  },
+  {
+   "default": "0",
+   "fieldname": "use_custom_style",
+   "fieldtype": "Check",
+   "label": "شکل و اندازه اختصاصی"
+  },
+  {
+   "fieldname": "custom_color",
+   "fieldtype": "Color",
+   "label": "رنگ"
+  },
+  {
+   "default": "0",
+   "fieldname": "hidden",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "مخفی"
+  },
+  {
+   "default": "0",
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "ترتیب"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-21 00:00:00.000000",
+ "module": "Home Manager",
+ "name": "SP Home Style",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,189 @@
+(() => {
+	const SP_HOME_VERSION = "11";
+	try {
+		if (localStorage.getItem("sp_home_version") !== SP_HOME_VERSION) {
+			localStorage.removeItem("_page:home-manager");
+			localStorage.setItem("sp_home_version", SP_HOME_VERSION);
+		}
+	} catch (_) { /* Storage is optional. */ }
+	let observer, queued = false, applying = false;
+	const originals = new WeakMap(), nativeLayouts = new WeakMap();
+	const has_manager_role = () => (frappe.user_roles || frappe.boot?.user?.roles || []).includes("System Manager") || frappe.session?.user === "Administrator";
+	const enabled = layout => Number(layout.enabled) && (Number(layout.apply_to_all_users) || has_manager_role());
+	const clamp = (value, min, max, fallback) => Number.isFinite(Number(value)) && value !== null && value !== "" ? Math.max(min, Math.min(max, Math.trunc(Number(value)))) : fallback;
+	const observe = () => observer?.observe(document.body, { childList: true, subtree: true });
+	const clear_sections = grid => {
+		grid.querySelectorAll(":scope > .sp-home-section").forEach(section => {
+			section.querySelectorAll(":scope > .desktop-icon").forEach(icon => grid.insertBefore(icon, section));
+			section.remove();
+		});
+	};
+	// Merge only icons authorized by Frappe. Keep native folders and user layout.
+	const sync_visibility = layout => {
+		const page = frappe.pages?.desktop?.desktop_page;
+		if (page?.edit_mode) { nativeLayouts.delete(page); return; }
+		if (!page || !Array.isArray(frappe.desktop_icons)) return;
+		if (!nativeLayouts.has(page)) nativeLayouts.set(page, frappe.desktop_icons.map(icon => ({ ...icon })));
+		const base = nativeLayouts.get(page).map(icon => ({ ...icon }));
+		if (enabled(layout)) {
+			const names = new Set(base.map(icon => icon.name || icon.label));
+			(frappe.boot.desktop_icons || []).forEach(icon => {
+				if (!names.has(icon.name || icon.label)) base.push({ ...icon });
+			});
+			const settings = new Map((layout.items || []).flatMap(item => [[item.name, item], [item.label, item]]));
+			base.forEach(icon => {
+				const item = settings.get(icon.name) || settings.get(icon.label);
+				if (item) icon.hidden = Number(item.hidden) ? 1 : 0;
+			});
+		}
+		const signature = icons => JSON.stringify(icons.map(icon => [icon.name || icon.label, Number(icon.hidden) || 0, icon.parent_icon || ""]));
+		if (signature(base) !== signature(frappe.desktop_icons)) { page.data = base; page.update(); }
+	};
+	const remember = el => {
+		if (originals.has(el)) return;
+		const box = el.querySelector(":scope > .icon-container");
+		originals.set(el, { src: box?.querySelector(":scope > img")?.getAttribute("src"), caption: el.querySelector(":scope > .icon-caption")?.innerHTML });
+	};
+	const restore = el => {
+		const original = originals.get(el);
+		if (!original) return;
+		const img = el.querySelector(":scope > .icon-container > img");
+		if (img && original.src) img.setAttribute("src", original.src);
+		const caption = el.querySelector(":scope > .icon-caption");
+		if (caption && original.caption !== undefined) caption.innerHTML = original.caption;
+		el.classList.remove("sp-home-icon");
+		el.querySelector(":scope > .icon-container > .sp-home-letter")?.remove();
+		["spShape", "spSize", "spStyle"].forEach(key => delete el.dataset[key]);
+		el.style.removeProperty("--sp-home-color");
+	};
+	const apply_icon_style = (el, item, layout) => {
+		remember(el);
+		el.classList.add("sp-home-icon");
+		const custom = Number(item.use_custom_style);
+		el.dataset.spShape = (custom && item.shape) || layout.default_shape || "rounded";
+		el.dataset.spSize = (custom && item.size) || layout.default_size || "medium";
+		el.dataset.spStyle = layout.icon_style || "Solid";
+		const img = el.querySelector(":scope > .icon-container > img.app-icon");
+		const box = el.querySelector(":scope > .icon-container");
+		if (img && item.icon_type !== "Folder") {
+			const url = frappe.utils.get_desktop_icon?.(item.label || item.name, (layout.icon_style || "Solid").toLowerCase());
+			if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
+		}
+		if (/^#[\da-f]{3}([\da-f]{3})?$/i.test(item.custom_color || "")) el.style.setProperty("--sp-home-color", item.custom_color);
+		else el.style.removeProperty("--sp-home-color");
+		const caption = el.querySelector(":scope > .icon-caption > .icon-title");
+		const label = __(item.custom_label || item.label || el.dataset.id);
+		if (box?.querySelector(":scope > svg.desktop-alphabet")) {
+			let letter = box.querySelector(".sp-home-letter");
+			if (!letter) { letter = document.createElement("span"); letter.className = "sp-home-letter"; box.append(letter); }
+			letter.textContent = label.slice(0, 1);
+		}
+		if (caption) {
+			if (caption.textContent !== label) caption.textContent = label;
+			caption.setAttribute("title", label);
+			caption.setAttribute("data-original-title", label);
+		}
+		if (img) img.alt = label;
+		el.setAttribute("aria-label", label);
+	};
+	const apply_home_layout = () => {
+		if (applying) return false;
+		document.querySelectorAll('a[href*="/sp-home-settings/"] .sidebar-item-label').forEach(el => { if (el.textContent !== "تنظیمات صفحه اصلی") el.textContent = "تنظیمات صفحه اصلی"; });
+		const layout = frappe.boot?.sp_home || {};
+		let container = document.querySelector(".desktop-container");
+		if (!container) return false;
+		if (container.getClientRects().length) document.title = "صفحه اصلی";
+		document.querySelectorAll('.desktop-search-wrapper [title="Search"], #desktop-navbar-modal-search[title="Search"]').forEach(el => el.title = "جستجو");
+		applying = true;
+		observer?.disconnect();
+		try {
+			sync_visibility(layout);
+			container = document.querySelector(".desktop-container");
+			const grid = container?.querySelector(":scope > .icons-container > .icons");
+			if (!grid) return false;
+			const active = enabled(layout) && !frappe.pages?.desktop?.desktop_page?.edit_mode;
+			clear_sections(grid);
+			container.classList.toggle("sp-home-enabled", !!active);
+			grid.classList.toggle("sp-home-grid", !!active);
+			if (!active) {
+				document.querySelectorAll(".sp-home-icon").forEach(restore);
+				document.querySelectorAll(".sp-home-modal-grid").forEach(el => el.classList.remove("sp-home-modal-grid"));
+				document.querySelectorAll(".sp-home-manage-btn").forEach(el => el.remove());
+				return true;
+			}
+			container.style.setProperty("--sp-gap-x", `${clamp(layout.gap_x, 0, 80, 8)}px`);
+			container.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, 0, 80, 8)}px`);
+			container.style.setProperty("--sp-cols", clamp(layout.columns, 2, 10, 5));
+			const items = new Map((layout.items || []).flatMap(item => [[item.name, item], [item.label, item]]));
+			// Never move folder thumbnails: they are nested native grids.
+			const icons = [...grid.querySelectorAll(":scope > a.desktop-icon")];
+			const groups = new Map();
+			icons.sort((a, b) => (items.get(a.dataset.id)?.sequence || 0) - (items.get(b.dataset.id)?.sequence || 0));
+			icons.forEach(el => {
+				const item = items.get(el.dataset.id) || { label: el.dataset.id };
+				apply_icon_style(el, item, layout);
+				const category = __(item.category || "عمومی");
+				if (!groups.has(category)) groups.set(category, []);
+				groups.get(category).push(el);
+			});
+			const categoryOrder = [...new Set((layout.items || []).map(item => __(item.category || "عمومی")))];
+			[...groups].sort((a, b) => categoryOrder.indexOf(a[0]) - categoryOrder.indexOf(b[0])).forEach(([category, members]) => {
+				const section = document.createElement("section");
+				section.className = "sp-home-section";
+				const heading = document.createElement("h2");
+				heading.className = "sp-home-section-title";
+				heading.textContent = category;
+				section.append(heading, ...members);
+				grid.append(section);
+			});
+			container.querySelectorAll(".folder-icon img").forEach(img => { img.alt = __(img.alt); });
+			document.querySelectorAll(".desktop-modal-body > .icons-container > .icons").forEach(modalGrid => {
+				modalGrid.classList.add("sp-home-modal-grid");
+				modalGrid.style.setProperty("--sp-cols", clamp(layout.columns, 2, 10, 5));
+				modalGrid.style.setProperty("--sp-gap-x", `${clamp(layout.gap_x, 0, 80, 8)}px`);
+				modalGrid.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, 0, 80, 8)}px`);
+				modalGrid.querySelectorAll(":scope > .desktop-icon").forEach(el => apply_icon_style(el, items.get(el.dataset.id) || {label: el.dataset.id}, layout));
+			});
+			if (has_manager_role() && !document.querySelector(".sp-home-manage-btn")) $("<a class='sp-home-manage-btn' href='/app/home-manager'>مدیریت صفحه اصلی</a>").appendTo(container.closest(".desktop-wrapper"));
+			return true;
+		} finally { applying = false; observe(); }
+	};
+	const schedule_apply = () => {
+		if (queued || applying) return;
+		queued = true;
+		requestAnimationFrame(() => { queued = false; apply_home_layout(); });
+	};
+	const bind = () => {
+		if (observer) return;
+		// The desktop container itself is replaced on route changes.
+		observer = new MutationObserver(records => {
+			if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => node.nodeType === 1 && (node.matches?.(".desktop-container, .icons-container, .icons, .desktop-icon") || node.querySelector?.(".desktop-container, .desktop-icon"))))) schedule_apply();
+		});
+		observe();
+		$(document).on("desktop_screen.sp_home", schedule_apply);
+		$(document).on("mouseenter.sp_home focusin.sp_home", "#desktop-navbar-modal-search", function () { this.title = "جستجو"; });
+		frappe.realtime?.on("sp_home_layout_updated", layout => { frappe.boot.sp_home = layout; schedule_apply(); });
+		let fetching = false;
+		const refresh = async () => {
+			if (fetching || document.hidden || !navigator.onLine) return;
+			fetching = true;
+			try {
+				const response = await frappe.call({ method: "sp_home_manager.home_manager.api.get_current_layout" });
+				if (response.message && JSON.stringify(response.message) !== JSON.stringify(frappe.boot.sp_home)) {
+					frappe.boot.sp_home = response.message;
+					schedule_apply();
+				}
+			} catch (_) { /* Reconnect/focus will retry; keep the last usable layout. */ }
+			finally { fetching = false; }
+		};
+		window.addEventListener("storage", event => { if (event.key === "sp_home_updated") refresh(); });
+		window.addEventListener("focus", refresh);
+		frappe.router?.on("change", schedule_apply);
+		document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+		// Network fallback only, not a render timer. Unchanged data never rebuilds DOM.
+		setInterval(() => { if (!frappe.realtime?.socket?.connected) refresh(); }, 15000);
+		schedule_apply();
+	};
+	$(bind);
+	window.sp_home_apply_layout = apply_home_layout;
+})();

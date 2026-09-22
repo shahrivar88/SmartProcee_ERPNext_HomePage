@@ -1,0 +1,22 @@
+[project]
+name = "sp_home_manager"
+authors = [
+    { name = "Smart Process", email = "info@smartprocess.local" }
+]
+description = "مدیریت فارسی و مستقل صفحه اصلی Frappe/ERPNext"
+requires-python = ">=3.10"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = []
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "B"]
+ignore = ["E501", "W191"]
+

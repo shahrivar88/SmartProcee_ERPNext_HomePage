@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "creation": "2026-09-21 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_custom_styles",
+  "apply_to_all_users",
+  "column_break_defaults",
+  "default_shape",
+  "default_size",
+  "icon_style",
+  "gap_section",
+  "columns",
+  "gap_x",
+  "gap_y",
+  "styles_section",
+  "styles"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enable_custom_styles",
+   "fieldtype": "Check",
+   "label": "فعال‌سازی چیدمان سفارشی"
+  },
+  {
+   "default": "1",
+   "fieldname": "apply_to_all_users",
+   "fieldtype": "Check",
+   "label": "اعمال برای همه کاربران"
+  },
+  {
+   "fieldname": "column_break_defaults",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "rounded",
+   "fieldname": "default_shape",
+   "fieldtype": "Select",
+   "label": "شکل پیش‌فرض",
+   "options": "rounded\ncircle\nsquare"
+  },
+  {
+   "default": "medium",
+   "fieldname": "default_size",
+   "fieldtype": "Select",
+   "label": "اندازه پیش‌فرض",
+   "options": "small\nmedium\nlarge"
+  },
+  {
+   "default": "Solid",
+   "fieldname": "icon_style",
+   "fieldtype": "Select",
+   "label": "سبک آیکون",
+   "options": "Subtle\nSolid"
+  },
+  {
+   "fieldname": "gap_section",
+   "fieldtype": "Section Break",
+   "label": "فاصله آیکون‌ها"
+  },
+  {
+   "default": "5",
+   "fieldname": "columns",
+   "fieldtype": "Int",
+   "label": "تعداد ستون"
+  },
+  {
+   "default": "8",
+   "fieldname": "gap_x",
+   "fieldtype": "Int",
+   "label": "فاصله افقی"
+  },
+  {
+   "default": "8",
+   "fieldname": "gap_y",
+   "fieldtype": "Int",
+   "label": "فاصله عمودی"
+  },
+  {
+   "fieldname": "styles_section",
+   "fieldtype": "Section Break",
+   "label": "ظاهر آیکون‌ها"
+  },
+  {
+   "fieldname": "styles",
+   "fieldtype": "Table",
+   "label": "تنظیمات آیکون‌ها",
+   "options": "SP Home Style"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-21 00:00:00.000000",
+ "module": "Home Manager",
+ "name": "SP Home Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

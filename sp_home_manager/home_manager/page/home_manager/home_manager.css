@@ -1,0 +1,145 @@
+.sp-home-editor {
+	direction: rtl;
+	padding: 8px 4px 32px;
+}
+
+.sp-home-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px 24px;
+	align-items: end;
+	background: var(--fg-color);
+	border: 1px solid var(--border-color);
+	border-radius: 12px;
+	padding: 16px;
+	margin-bottom: 12px;
+}
+
+.sp-home-toolbar label {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.sp-home-toolbar .sp-toggle {
+	flex-direction: row;
+	align-items: center;
+	color: var(--text-color);
+	font-size: 13px;
+}
+
+.sp-home-toolbar input[type="number"] {
+	width: 88px;
+}
+
+.sp-home-hint {
+	color: var(--text-muted);
+	margin-bottom: 16px;
+	font-size: 13px;
+}
+
+.sp-home-board {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+.sp-home-category {
+	background: var(--fg-color);
+	border: 1px solid var(--border-color);
+	border-radius: 16px;
+	padding: 14px;
+}
+
+.sp-home-category header {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.sp-category-title {
+	border: 0;
+	background: transparent;
+	font-size: 16px;
+	font-weight: 600;
+	width: min(320px, 70%);
+}
+
+.sp-home-cards {
+	display: grid;
+	width: calc(var(--sp-cols) * 140px + (var(--sp-cols) - 1) * var(--sp-gap-x));
+	max-width: 100%;
+	margin-inline: auto;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 140px));
+	justify-content: center;
+	column-gap: var(--sp-gap-x);
+	row-gap: var(--sp-gap-y);
+	min-height: 132px;
+}
+
+.sp-home-card {
+	border: 1px solid var(--border-color);
+	border-radius: 14px;
+	padding: 12px 8px;
+	text-align: center;
+	cursor: pointer;
+	background: var(--bg-color);
+}
+
+.sp-home-card.is-hidden {
+	opacity: 0.45;
+}
+
+.sp-home-card-icon {
+	width: 54px;
+	height: 54px;
+	margin: 0 auto 8px;
+	border-radius: 16px;
+	background: var(--bg-color);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	font-weight: 700;
+}
+
+.sp-home-card[data-shape="circle"] .sp-home-card-icon {
+	border-radius: 50%;
+}
+
+.sp-home-card[data-shape="square"] .sp-home-card-icon {
+	border-radius: 0;
+}
+
+.sp-home-card[data-size="small"] .sp-home-card-icon {
+	width: 44px;
+	height: 44px;
+}
+
+.sp-home-card[data-size="large"] .sp-home-card-icon {
+	width: 64px;
+	height: 64px;
+}
+
+.sp-home-card-icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.sp-home-card-title {
+	font-size: 13px;
+	font-weight: 600;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	line-height: 1.3;
+}
+
+.sp-home-card-meta {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-top: 4px;
+}
