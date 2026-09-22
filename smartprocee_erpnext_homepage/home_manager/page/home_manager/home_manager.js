@@ -35,7 +35,7 @@ class SPHomeManager {
 
 	load() {
 		frappe.call({
-			method: "sp_home_manager.home_manager.api.get_layout",
+			method: "smartprocee_erpnext_homepage.home_manager.api.get_layout",
 			freeze: true,
 			freeze_message: __("در حال بارگذاری صفحه اصلی..."),
 			callback: (r) => {
@@ -300,7 +300,7 @@ class SPHomeManager {
 			primary_action_label: __("بساز"),
 			primary_action: (values) => {
 				frappe.call({
-					method: "sp_home_manager.home_manager.api.create_desktop_icon",
+					method: "smartprocee_erpnext_homepage.home_manager.api.create_desktop_icon",
 					args: values,
 					freeze: true,
 					callback: (r) => {
@@ -343,7 +343,7 @@ class SPHomeManager {
 			items: (this.state.items || []).filter((item) => !item.placeholder && item.name),
 		};
 		frappe.call({
-			method: "sp_home_manager.home_manager.api.save_layout",
+			method: "smartprocee_erpnext_homepage.home_manager.api.save_layout",
 			args: { payload: JSON.stringify(payload) },
 			freeze: true,
 			freeze_message: __("در حال اعمال روی صفحه اصلی..."),

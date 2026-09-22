@@ -1,5 +1,5 @@
 [project]
-name = "sp_home_manager"
+name = "smartprocee_erpnext_homepage"
 authors = [
     { name = "Smart Process", email = "info@smartprocess.local" }
 ]
@@ -19,4 +19,3 @@ line-length = 110
 [tool.ruff.lint]
 select = ["F", "E", "W", "I", "B"]
 ignore = ["E501", "W191"]
-

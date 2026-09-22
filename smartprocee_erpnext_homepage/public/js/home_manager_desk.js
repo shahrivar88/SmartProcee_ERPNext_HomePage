@@ -1,5 +1,5 @@
 (() => {
-	const SP_HOME_VERSION = "11";
+	const SP_HOME_VERSION = "12";
 	try {
 		if (localStorage.getItem("sp_home_version") !== SP_HOME_VERSION) {
 			localStorage.removeItem("_page:home-manager");
@@ -33,7 +33,11 @@
 			const settings = new Map((layout.items || []).flatMap(item => [[item.name, item], [item.label, item]]));
 			base.forEach(icon => {
 				const item = settings.get(icon.name) || settings.get(icon.label);
-				if (item) icon.hidden = Number(item.hidden) ? 1 : 0;
+				if (item) {
+					icon.hidden = Number(item.hidden) ? 1 : 0;
+					// Render the same flat list as the settings page without changing Desktop Icon records.
+					icon.parent_icon = "";
+				}
 			});
 		}
 		const signature = icons => JSON.stringify(icons.map(icon => [icon.name || icon.label, Number(icon.hidden) || 0, icon.parent_icon || ""]));
@@ -86,6 +90,25 @@
 		if (img) img.alt = label;
 		el.setAttribute("aria-label", label);
 	};
+	const add_runtime_icons = (grid, layout) => {
+		const existing = new Set([...grid.querySelectorAll(":scope > a.desktop-icon")].map(el => el.dataset.id));
+		const template = grid.querySelector(":scope > a.desktop-icon");
+		if (!template) return;
+		(layout.items || []).filter(item => !Number(item.hidden) && !existing.has(item.name)).forEach(item => {
+			const el = template.cloneNode(true);
+			const label = __(item.custom_label || item.label || item.name);
+			el.dataset.id = item.name;
+			el.dataset.spRuntime = "1";
+			el.href = item.link || (item.link_to ? `/app/${frappe.router.slug(item.link_to)}` : "#");
+			const box = el.querySelector(":scope > .icon-container");
+			if (box) box.innerHTML = `<span class="sp-home-letter">${frappe.utils.escape_html(label.slice(0, 1))}</span>`;
+			const title = el.querySelector(":scope > .icon-caption > .icon-title");
+			if (title) title.textContent = label;
+			if (!item.link && !item.link_to) el.addEventListener("click", event => event.preventDefault());
+			grid.append(el);
+			existing.add(item.name);
+		});
+	};
 	const apply_home_layout = () => {
 		if (applying) return false;
 		document.querySelectorAll('a[href*="/sp-home-settings/"] .sidebar-item-label').forEach(el => { if (el.textContent !== "تنظیمات صفحه اصلی") el.textContent = "تنظیمات صفحه اصلی"; });
@@ -103,6 +126,7 @@
 			if (!grid) return false;
 			const active = enabled(layout) && !frappe.pages?.desktop?.desktop_page?.edit_mode;
 			clear_sections(grid);
+			grid.querySelectorAll(':scope > [data-sp-runtime="1"]').forEach(el => el.remove());
 			container.classList.toggle("sp-home-enabled", !!active);
 			grid.classList.toggle("sp-home-grid", !!active);
 			if (!active) {
@@ -115,7 +139,8 @@
 			container.style.setProperty("--sp-gap-y", `${clamp(layout.gap_y, 0, 80, 8)}px`);
 			container.style.setProperty("--sp-cols", clamp(layout.columns, 2, 10, 5));
 			const items = new Map((layout.items || []).flatMap(item => [[item.name, item], [item.label, item]]));
-			// Never move folder thumbnails: they are nested native grids.
+			add_runtime_icons(grid, layout);
+			// All configured icons are top-level runtime copies, matching the settings preview.
 			const icons = [...grid.querySelectorAll(":scope > a.desktop-icon")];
 			const groups = new Map();
 			icons.sort((a, b) => (items.get(a.dataset.id)?.sequence || 0) - (items.get(b.dataset.id)?.sequence || 0));
@@ -168,7 +193,7 @@
 			if (fetching || document.hidden || !navigator.onLine) return;
 			fetching = true;
 			try {
-				const response = await frappe.call({ method: "sp_home_manager.home_manager.api.get_current_layout" });
+				const response = await frappe.call({ method: "smartprocee_erpnext_homepage.home_manager.api.get_current_layout" });
 				if (response.message && JSON.stringify(response.message) !== JSON.stringify(frappe.boot.sp_home)) {
 					frappe.boot.sp_home = response.message;
 					schedule_apply();

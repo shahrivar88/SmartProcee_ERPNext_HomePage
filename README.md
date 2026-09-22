@@ -1,20 +1,20 @@
-# مدیریت مستقل صفحه اصلی ERPNext
+# SmartProcee_ERPNext_HomePage
 
 این اپ، چیدمان و ظاهر صفحه اصلی Frappe/ERPNext را بدون تغییر سورس هسته مدیریت می‌کند. همه متن‌های قابل مشاهده فارسی هستند.
 
 ## نصب
 
 ```bash
-bench get-app https://github.com/shahrivar88/sp-home-manager.git
-bench --site SITE install-app sp_home_manager
-bench build --app sp_home_manager
+bench get-app https://github.com/shahrivar88/SmartProcee_ERPNext_HomePage.git
+bench --site SITE install-app smartprocee_erpnext_homepage
+bench build --app smartprocee_erpnext_homepage
 bench --site SITE migrate
 ```
 
 ## حذف و بازگردانی
 
 ```bash
-bench --site SITE uninstall-app sp_home_manager
+bench --site SITE uninstall-app smartprocee_erpnext_homepage
 bench build
 ```
 

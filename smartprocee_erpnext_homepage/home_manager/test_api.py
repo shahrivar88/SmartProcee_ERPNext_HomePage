@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import frappe
 
-from sp_home_manager.home_manager import api
+from smartprocee_erpnext_homepage.home_manager import api
 
 
 class TestHomeLayout(unittest.TestCase):

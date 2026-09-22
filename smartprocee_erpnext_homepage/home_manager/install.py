@@ -3,7 +3,7 @@ import json
 import frappe
 
 from frappe.desk.doctype.desktop_icon.desktop_icon import clear_desktop_icons_cache
-from sp_home_manager.home_manager.api import MANAGER_ICON_LABEL, ensure_manager_icon
+from smartprocee_erpnext_homepage.home_manager.api import MANAGER_ICON_LABEL, ensure_manager_icon
 
 STATE_KEY = "sp_home_manager_install_state"
 ICON_FIELDS = (
@@ -77,7 +77,7 @@ def mark_migrated_install():
 
 def _claim_module():
 	if frappe.db.exists("Module Def", "Home Manager"):
-		frappe.db.set_value("Module Def", "Home Manager", "app_name", "sp_home_manager", update_modified=False)
+		frappe.db.set_value("Module Def", "Home Manager", "app_name", "smartprocee_erpnext_homepage", update_modified=False)
 
 
 def _clear_caches():

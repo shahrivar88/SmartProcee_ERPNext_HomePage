@@ -5,7 +5,7 @@ import frappe
 
 from frappe.desk.doctype.desktop_icon.desktop_icon import clear_desktop_icons_cache
 from frappe.utils import cint
-from sp_home_manager.home_manager.labels import display_label
+from smartprocee_erpnext_homepage.home_manager.labels import display_label
 
 MANAGER_ICON_LABEL = "مدیریت صفحه اصلی"
 MANAGER_ICON_LINK = "/app/home-manager"
@@ -59,6 +59,9 @@ def get_boot_layout():
 				"hidden": cint(style.hidden) if style else cint(icon.hidden),
 				"sequence": cint(style.sequence) if style and style.sequence else cint(icon.idx),
 				"icon_type": icon.icon_type,
+				"link_type": icon.link_type,
+				"link_to": icon.link_to,
+				"link": icon.link,
 				"parent_icon": icon.parent_icon,
 				"icon_image": icon.icon_image,
 				"logo_url": icon.logo_url,
