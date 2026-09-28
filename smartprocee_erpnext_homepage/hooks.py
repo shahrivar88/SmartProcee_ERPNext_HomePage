@@ -6,9 +6,23 @@ app_email = "info@smartprocess.local"
 app_license = "mit"
 required_apps = ["frappe"]
 
-app_include_js = ["/assets/smartprocee_erpnext_homepage/js/home_manager_desk.js?v=10"]
-app_include_css = ["/assets/smartprocee_erpnext_homepage/css/home_manager_desk.css?v=10"]
+app_include_js = [
+	"/assets/smartprocee_erpnext_homepage/js/home_icon.js?v=19",
+	"/assets/smartprocee_erpnext_homepage/js/home_manager_editor.js?v=19",
+	"/assets/smartprocee_erpnext_homepage/js/home_manager_desk.js?v=19",
+]
+app_include_css = ["/assets/smartprocee_erpnext_homepage/css/home_manager_desk.css?v=19"]
 boot_session = "smartprocee_erpnext_homepage.home_manager.boot.boot_session"
 after_install = "smartprocee_erpnext_homepage.home_manager.install.after_install"
 after_migrate = ["smartprocee_erpnext_homepage.home_manager.install.after_migrate"]
 before_uninstall = "smartprocee_erpnext_homepage.home_manager.install.before_uninstall"
+has_permission = {
+	"SP Home Preference": [
+		"smartprocee_erpnext_homepage.home_manager.permissions.has_preference_permission",
+	],
+}
+permission_query_conditions = {
+	"SP Home Preference": [
+		"smartprocee_erpnext_homepage.home_manager.permissions.preference_query",
+	],
+}

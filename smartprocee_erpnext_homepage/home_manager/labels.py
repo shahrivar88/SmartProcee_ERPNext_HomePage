@@ -2,7 +2,10 @@
 
 LABELS = {
     "Home Manager": "مدیریت صفحه اصلی", "SP Home Settings": "تنظیمات صفحه اصلی",
-    "SP Home Style": "ظاهر آیکون", "Desktop": "صفحه اصلی", "Home": "خانه",
+    "SP Home Style": "ظاهر آیکون", "SP Home Category": "دسته صفحه اصلی",
+    "SP Home Preference": "چیدمان شخصی", "SP Home Preference Category": "دسته شخصی",
+    "SP Home Preference Item": "آیکون شخصی", "SP Home Folder": "پوشه صفحه اصلی",
+    "SP Home Preference Folder": "ترتیب پوشه شخصی", "Desktop": "صفحه اصلی", "Home": "خانه",
     "Framework": "چارچوب فراپه", "ERPNext": "سامانه برنامه‌ریزی منابع",
     "ERPNext Settings": "تنظیمات سامانه", "Accounting": "حسابداری",
     "Buying": "خرید", "Banking": "بانکداری", "Stock": "انبار",

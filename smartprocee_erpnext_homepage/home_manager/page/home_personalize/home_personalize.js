@@ -1,0 +1,14 @@
+frappe.pages["home-personalize"].on_page_load = function (wrapper) {
+	const page = frappe.ui.make_app_page({
+		parent: wrapper,
+		title: __("چیدمان من"),
+		single_column: true,
+	});
+	wrapper.home_manager = new SPHomeManager(page, { mode: "personal" });
+};
+
+frappe.pages["home-personalize"].on_page_show = function (wrapper) {
+	if (wrapper.home_manager) {
+		wrapper.home_manager.load();
+	}
+};

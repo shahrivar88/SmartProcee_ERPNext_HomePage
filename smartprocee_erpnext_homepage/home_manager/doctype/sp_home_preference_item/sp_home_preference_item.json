@@ -1,6 +1,6 @@
 {
  "actions": [],
- "creation": "2026-09-21 00:00:00.000000",
+ "creation": "2026-09-27 00:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -14,7 +14,6 @@
   "size",
   "use_custom_style",
   "custom_color",
-  "custom_link",
   "custom_icon_image",
   "icon_name",
   "hidden",
@@ -55,7 +54,6 @@
    "default": "rounded",
    "fieldname": "shape",
    "fieldtype": "Select",
-   "in_list_view": 1,
    "label": "شکل",
    "options": "rounded\ncircle\nsquare"
   },
@@ -76,11 +74,6 @@
    "fieldname": "custom_color",
    "fieldtype": "Color",
    "label": "رنگ"
-  },
-  {
-   "fieldname": "custom_link",
-   "fieldtype": "Data",
-   "label": "لینک"
   },
   {
    "fieldname": "custom_icon_image",
@@ -108,9 +101,9 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-09-21 00:00:00.000000",
+ "modified": "2026-09-27 00:00:00.000000",
  "module": "Home Manager",
- "name": "SP Home Style",
+ "name": "SP Home Preference Item",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",

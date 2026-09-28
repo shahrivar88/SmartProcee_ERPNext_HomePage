@@ -40,6 +40,7 @@ def after_install():
 	_capture_state()
 	_claim_module()
 	ensure_manager_icon()
+	_sync_layout()
 	_clear_caches()
 	frappe.db.commit()
 
@@ -48,6 +49,7 @@ def after_migrate():
 	_capture_state()
 	_claim_module()
 	ensure_manager_icon()
+	_sync_layout()
 	_clear_caches()
 
 
@@ -73,6 +75,12 @@ def mark_migrated_install():
 	frappe.db.set_default(STATE_KEY, json.dumps({"manager_icon": None}))
 	_claim_module()
 	frappe.db.commit()
+
+
+def _sync_layout():
+	from smartprocee_erpnext_homepage.home_manager.migrate import sync_home_layout
+
+	sync_home_layout()
 
 
 def _claim_module():

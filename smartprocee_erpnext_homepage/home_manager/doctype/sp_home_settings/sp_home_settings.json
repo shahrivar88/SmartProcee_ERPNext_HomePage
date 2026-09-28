@@ -14,6 +14,10 @@
   "columns",
   "gap_x",
   "gap_y",
+  "categories_section",
+  "categories",
+  "folders_section",
+  "folders",
   "styles_section",
   "styles"
  ],
@@ -77,6 +81,28 @@
    "fieldname": "gap_y",
    "fieldtype": "Int",
    "label": "فاصله عمودی"
+  },
+  {
+   "fieldname": "categories_section",
+   "fieldtype": "Section Break",
+   "label": "دسته‌ها"
+  },
+  {
+   "fieldname": "categories",
+   "fieldtype": "Table",
+   "label": "ترتیب دسته‌ها",
+   "options": "SP Home Category"
+  },
+  {
+   "fieldname": "folders_section",
+   "fieldtype": "Section Break",
+   "label": "پوشه‌ها"
+  },
+  {
+   "fieldname": "folders",
+   "fieldtype": "Table",
+   "label": "پوشه‌های صفحه اصلی",
+   "options": "SP Home Folder"
   },
   {
    "fieldname": "styles_section",
