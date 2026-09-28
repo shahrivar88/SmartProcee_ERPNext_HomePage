@@ -19,7 +19,8 @@
   "folders_section",
   "folders",
   "styles_section",
-  "styles"
+  "styles",
+  "owned_icons"
  ],
  "fields": [
   {
@@ -114,6 +115,14 @@
    "fieldtype": "Table",
    "label": "تنظیمات آیکون‌ها",
    "options": "SP Home Style"
+  },
+  {
+   "fieldname": "owned_icons",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "آیکون‌های ساخته‌شده توسط مدیریت صفحه اصلی",
+   "options": "SP Home Owned Icon",
+   "read_only": 1
   }
  ],
  "issingle": 1,

@@ -207,7 +207,25 @@ def create_desktop_icon(label, link=""):
 		}
 	)
 	doc.insert(ignore_permissions=True)
+	_record_owned_icon(doc.name)
 	_clear_desktop_caches()
+	return _global_layout()
+
+
+@frappe.whitelist()
+def delete_owned_desktop_icon(name):
+	"""Delete a Desktop Icon only when this app created it.
+
+	Hiding, permission changes, folder membership, and personal layouts never call this.
+	"""
+	_require_manager()
+	name = (name or "").strip()
+	if not _is_deletable_owned_icon(name):
+		frappe.throw("این آیکون توسط مدیریت صفحه اصلی ساخته نشده است و حذف نمی‌شود.")
+	_remove_owned_icon_references(name)
+	frappe.delete_doc("Desktop Icon", name, ignore_permissions=True, force=True)
+	_clear_desktop_caches()
+	_publish_refresh("global")
 	return _global_layout()
 
 
@@ -422,12 +440,15 @@ def _global_layout():
 		],
 		order_by="idx asc, label asc",
 	)
+	owned_names = _owned_icon_names()
 	items = []
 	for icon in icons:
 		if icon.icon_type == "Folder":
 			continue
 		style = style_map.get(icon.name) or style_map.get(icon.label)
-		items.append(_item_from_icon(icon, style, settings))
+		item = _item_from_icon(icon, style, settings)
+		item["owned"] = 1 if icon.name in owned_names else 0
+		items.append(item)
 
 	categories = _stored_category_names(settings.categories)
 	if not categories:
@@ -836,6 +857,104 @@ def _clamp_gap(value, default):
 	if number > GAP_MAX:
 		return GAP_MAX
 	return number
+
+
+def _owned_icon_names():
+	if not frappe.db.table_exists("SP Home Owned Icon"):
+		return set()
+	return {
+		name
+		for name in frappe.get_all(
+			"SP Home Owned Icon",
+			filters={"parenttype": "SP Home Settings", "parentfield": "owned_icons"},
+			pluck="desktop_icon",
+		)
+		if name
+	}
+
+
+def _record_owned_icon(name):
+	settings = _get_settings()
+	if any((row.desktop_icon or "") == name for row in (settings.get("owned_icons") or [])):
+		return
+	settings.append("owned_icons", {"desktop_icon": name})
+	settings.save(ignore_permissions=True)
+
+
+def _is_deletable_owned_icon(name):
+	"""Ownership is the app-written child row, plus a non-standard icon with no app."""
+	if not name or name not in _owned_icon_names():
+		return False
+	icon = frappe.db.get_value("Desktop Icon", name, ["standard", "app"], as_dict=True)
+	if not icon or cint(icon.standard) or (icon.app or "").strip():
+		return False
+	return True
+
+
+def _remove_owned_icon_references(name):
+	settings = _get_settings()
+	style_fields = (
+		"desktop_icon",
+		"custom_label",
+		"category",
+		"folder",
+		"shape",
+		"size",
+		"use_custom_style",
+		"custom_color",
+		"custom_link",
+		"custom_icon_image",
+		"icon_name",
+		"hidden",
+		"sequence",
+	)
+	kept_styles = [
+		{field: row.get(field) for field in style_fields}
+		for row in (settings.styles or [])
+		if row.desktop_icon != name
+	]
+	kept_owned = [
+		{"desktop_icon": row.desktop_icon}
+		for row in (settings.get("owned_icons") or [])
+		if row.desktop_icon and row.desktop_icon != name
+	]
+	settings.set("styles", [])
+	for row in kept_styles:
+		settings.append("styles", row)
+	settings.set("owned_icons", [])
+	for row in kept_owned:
+		settings.append("owned_icons", row)
+	settings.save(ignore_permissions=True)
+
+	if not frappe.db.table_exists("SP Home Preference Item"):
+		return
+	preference_fields = (
+		"desktop_icon",
+		"custom_label",
+		"category",
+		"folder",
+		"shape",
+		"size",
+		"use_custom_style",
+		"custom_color",
+		"custom_icon_image",
+		"icon_name",
+		"hidden",
+		"sequence",
+	)
+	for preference_name in frappe.get_all("SP Home Preference", pluck="name"):
+		doc = frappe.get_doc("SP Home Preference", preference_name)
+		if not any(row.desktop_icon == name for row in (doc.items or [])):
+			continue
+		kept_items = [
+			{field: row.get(field) for field in preference_fields}
+			for row in doc.items
+			if row.desktop_icon != name
+		]
+		doc.set("items", [])
+		for row in kept_items:
+			doc.append("items", row)
+		doc.save(ignore_permissions=True)
 
 
 def _forget_removed_categories(previous, saved_names):

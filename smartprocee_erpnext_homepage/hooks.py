@@ -7,11 +7,11 @@ app_license = "mit"
 required_apps = ["frappe"]
 
 app_include_js = [
-	"/assets/smartprocee_erpnext_homepage/js/home_icon.js?v=19",
-	"/assets/smartprocee_erpnext_homepage/js/home_manager_editor.js?v=19",
-	"/assets/smartprocee_erpnext_homepage/js/home_manager_desk.js?v=19",
+	"/assets/smartprocee_erpnext_homepage/js/home_icon.js?v=20",
+	"/assets/smartprocee_erpnext_homepage/js/home_manager_editor.js?v=20",
+	"/assets/smartprocee_erpnext_homepage/js/home_manager_desk.js?v=20",
 ]
-app_include_css = ["/assets/smartprocee_erpnext_homepage/css/home_manager_desk.css?v=19"]
+app_include_css = ["/assets/smartprocee_erpnext_homepage/css/home_manager_desk.css?v=20"]
 boot_session = "smartprocee_erpnext_homepage.home_manager.boot.boot_session"
 after_install = "smartprocee_erpnext_homepage.home_manager.install.after_install"
 after_migrate = ["smartprocee_erpnext_homepage.home_manager.install.after_migrate"]

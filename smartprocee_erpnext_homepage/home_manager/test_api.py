@@ -346,6 +346,8 @@ class TestHomeLayout(unittest.TestCase):
             api.save_layout(self.layout)
         with self.assertRaises(frappe.PermissionError):
             api.create_desktop_icon("نباید ساخته شود")
+        with self.assertRaises(frappe.PermissionError):
+            api.delete_owned_desktop_icon("Selling")
 
     def test_client_has_no_fixed_icon_placement(self):
         root = frappe.get_app_path("smartprocee_erpnext_homepage")
@@ -397,6 +399,12 @@ class TestHomeLayout(unittest.TestCase):
         self.assertIn(".slice(0, 4)", icon_js[members:members + 700])
         self.assertIn("sp_home_resolve_icon", icon_js[face:face + 1200])
         self.assertIn("sp_home_folder_face", desk)
+        self.assertIn("delete_owned_desktop_icon", editor)
+        self.assertIn("item.owned", editor)
+        self.assertIn("item.hidden = 1", editor)
+        self.assertIn("مخفی کردن از صفحه اصلی", editor)
+        self.assertIn("حذف دائمی آیکون سفارشی", editor)
+        self.assertIn("این مخفی کردن نیست", editor)
         self.assertIn("sp_home_folder_face", editor)
 
     def test_category_rename_keeps_idx_icons_folders_and_preferences(self):
@@ -471,6 +479,102 @@ class TestHomeLayout(unittest.TestCase):
         self.assertEqual(
             self.before,
             frappe.get_all("Desktop Icon", fields=["name", "hidden", "idx", "parent_icon"], order_by="name"),
+        )
+
+    def test_owned_custom_icon_delete_does_not_touch_foreign_icons(self):
+        selling = "Selling"
+        self.assertTrue(frappe.db.exists("Desktop Icon", selling))
+        self.assertEqual(frappe.db.get_value("Desktop Icon", selling, "app"), "erpnext")
+        label = "آیکون مالکیت آزمون"
+        with patch.object(frappe, "publish_realtime"):
+            created = api.create_desktop_icon(label, "/app/owned-icon-test")
+        owned = next(row for row in created["items"] if row["label"] == label)
+        self.assertEqual(owned["owned"], 1)
+        self.assertEqual(next(row["owned"] for row in created["items"] if row["name"] == selling), 0)
+        self.assertIn(owned["name"], api._owned_icon_names())
+
+        payload = api.get_layout()
+        target = next(row for row in payload["items"] if row["name"] == owned["name"])
+        folder_name = "پوشه مالکیت آزمون"
+        payload["folders"] = list(payload.get("folders") or []) + [{
+            "folder_name": folder_name,
+            "category": target["category"],
+            "sequence": 4,
+            "icon_name": "folder",
+            "custom_icon_image": "",
+        }]
+        target["folder"] = folder_name
+        target["hidden"] = 0
+        old_category = payload["categories"][0]
+        renamed = old_category + " بدون حذف"
+        for item in payload["items"]:
+            if item["category"] == old_category:
+                item["category"] = renamed
+        for folder in payload["folders"]:
+            if folder["category"] == old_category:
+                folder["category"] = renamed
+        payload["categories"][0] = renamed
+        payload["category_renames"] = [{"from": old_category, "to": renamed}]
+        with patch.object(frappe, "publish_realtime"):
+            renamed_layout = api.save_layout(payload)
+        self.assertTrue(frappe.db.exists("Desktop Icon", owned["name"]))
+        self.assertTrue(frappe.db.exists("Desktop Icon", selling))
+        self.assertIn(owned["name"], api._owned_icon_names())
+        self.assertIn(renamed, renamed_layout["categories"])
+
+        hidden_payload = api.get_layout()
+        hidden_row = next(row for row in hidden_payload["items"] if row["name"] == owned["name"])
+        hidden_row["hidden"] = 1
+        with patch.object(frappe, "publish_realtime"):
+            api.save_layout(hidden_payload)
+        self.assertTrue(frappe.db.exists("Desktop Icon", owned["name"]))
+        self.assertEqual(
+            frappe.db.get_value("SP Home Style", {"desktop_icon": owned["name"]}, "hidden"),
+            1,
+        )
+
+        user = self._make_user("sp-home-owned@example.com")
+        frappe.set_user(user)
+        personal = api.get_my_layout()
+        visible = next(row for row in personal["items"] if row["name"] != owned["name"])
+        visible["sequence"] = 11
+        with patch.object(frappe, "publish_realtime"):
+            api.save_my_layout(personal)
+        frappe.set_user("Administrator")
+
+        self._set_desktop_icon_roles(selling, ["System Manager"])
+        frappe.set_user(user)
+        blocked = api.get_current_layout()
+        self.assertNotIn(selling, [row["name"] for row in blocked["items"]])
+        self.assertTrue(frappe.db.exists("Desktop Icon", selling))
+        self.assertTrue(frappe.db.exists("Desktop Icon", owned["name"]))
+        frappe.set_user("Administrator")
+        self._set_desktop_icon_roles(selling, [])
+        frappe.set_user(user)
+        restored = api.get_current_layout()
+        self.assertIn(selling, [row["name"] for row in restored["items"]])
+        frappe.set_user("Administrator")
+
+        settings = frappe.get_single("SP Home Settings")
+        settings.append("owned_icons", {"desktop_icon": selling})
+        settings.save(ignore_permissions=True)
+        with self.assertRaises(frappe.ValidationError):
+            api.delete_owned_desktop_icon(selling)
+        self.assertTrue(frappe.db.exists("Desktop Icon", selling))
+
+        with patch.object(frappe, "publish_realtime"):
+            deleted = api.delete_owned_desktop_icon(owned["name"])
+        self.assertFalse(frappe.db.exists("Desktop Icon", owned["name"]))
+        self.assertFalse(any(row["name"] == owned["name"] for row in deleted["items"]))
+        self.assertFalse(frappe.db.exists("SP Home Style", {"desktop_icon": owned["name"]}))
+        self.assertFalse(frappe.get_all("SP Home Preference Item", filters={"desktop_icon": owned["name"]}))
+        self.assertNotIn(owned["name"], api._owned_icon_names())
+        self.assertTrue(any(row["folder_name"] == folder_name for row in deleted["folders"]))
+        self.assertTrue(frappe.db.exists("Desktop Icon", selling))
+        self.assertEqual(self._preference_value(user, visible["name"], "sequence"), 11)
+        self.assertEqual(
+            [row.name for row in self.before],
+            [row.name for row in frappe.get_all("Desktop Icon", fields=["name"], order_by="name")],
         )
 
     def test_deleted_global_category_is_not_restored_by_preference(self):

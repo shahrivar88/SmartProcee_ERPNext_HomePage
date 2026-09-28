@@ -286,7 +286,7 @@ class SPHomeManager {
 		const markup = this.icon_markup(item);
 		const $card = $(`
 			<article class="sp-home-card ${item.hidden ? "is-hidden" : ""}" data-name="${frappe.utils.escape_html(item.name)}" data-shape="${shape}" data-size="${size}">
-				<button class="sp-home-delete" type="button" title="مخفی کردن آیکون" aria-label="مخفی کردن آیکون">×</button>
+				<button class="sp-home-delete" type="button" title="مخفی کردن از صفحه اصلی" aria-label="مخفی کردن از صفحه اصلی">×</button>
 				<div class="sp-home-card-icon ${markup.className || ""}" style="${markup.background ? `background:${markup.background}` : ""}${markup.stroke ? `;--icon-stroke:${markup.stroke}` : ""}">${markup.html || ""}</div>
 				<div class="sp-home-card-title">${frappe.utils.escape_html(label)}</div>
 			</article>
@@ -751,7 +751,7 @@ class SPHomeManager {
 			},
 			{ fieldname: "use_custom_style", fieldtype: "Check", label: "شکل و اندازهٔ اختصاصی", default: item.use_custom_style },
 			{ fieldname: "custom_color", fieldtype: "Color", label: __("رنگ"), default: item.custom_color },
-			{ fieldname: "hidden", fieldtype: "Check", label: __("مخفی شود"), default: item.hidden }
+			{ fieldname: "hidden", fieldtype: "Check", label: __("مخفی در صفحه اصلی"), description: __("فقط نمایش در صفحه اصلی را عوض می‌کند و آیکون استاندارد را حذف نمی‌کند."), default: item.hidden }
 		);
 		const dialog = new frappe.ui.Dialog({
 			title: __("ویرایش آیکون"),
@@ -768,6 +768,23 @@ class SPHomeManager {
 				this.render();
 			},
 		});
+		if (this.mode === "global" && item.owned) {
+			dialog.set_secondary_action_label(__("حذف دائمی آیکون سفارشی"));
+			dialog.set_secondary_action(() => {
+				frappe.confirm(__("آیکون سفارشی «{0}» و داده‌های وابسته در مدیریت صفحه اصلی برای همیشه حذف شوند؟ این مخفی کردن نیست.", [item.custom_label || item.label]), () => {
+					frappe.call({
+						method: "smartprocee_erpnext_homepage.home_manager.api.delete_owned_desktop_icon",
+						args: { name: item.name },
+						freeze: true,
+						callback: (response) => {
+							this.state = response.message;
+							dialog.hide();
+							this.render();
+						},
+					});
+				});
+			});
+		}
 		dialog.show();
 		for (const name of ["shape", "size"]) {
 			dialog.fields_dict[name].$input.on("change.sp_home", () => dialog.set_value("use_custom_style", 1));
