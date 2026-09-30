@@ -6,6 +6,13 @@
  "engine": "InnoDB",
  "field_order": [
   "user",
+  "metrics_section",
+  "columns_override",
+  "gap_x_override",
+  "gap_y_override",
+  "default_shape_override",
+  "default_size_override",
+  "icon_style_override",
   "categories_section",
   "categories",
   "folders_section",
@@ -22,6 +29,47 @@
    "options": "User",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "metrics_section",
+   "fieldtype": "Section Break",
+   "label": "تنظیمات نمایشی شخصی"
+  },
+  {
+   "description": "خالی یعنی مقدار پیش‌فرض عمومی",
+   "fieldname": "columns_override",
+   "fieldtype": "Data",
+   "label": "ستون"
+  },
+  {
+   "description": "خالی یعنی مقدار پیش‌فرض عمومی",
+   "fieldname": "gap_x_override",
+   "fieldtype": "Data",
+   "label": "فاصله افقی"
+  },
+  {
+   "description": "خالی یعنی مقدار پیش‌فرض عمومی",
+   "fieldname": "gap_y_override",
+   "fieldtype": "Data",
+   "label": "فاصله عمودی"
+  },
+  {
+   "description": "خالی یعنی مقدار پیش‌فرض عمومی",
+   "fieldname": "default_shape_override",
+   "fieldtype": "Data",
+   "label": "شکل"
+  },
+  {
+   "description": "خالی یعنی مقدار پیش‌فرض عمومی",
+   "fieldname": "default_size_override",
+   "fieldtype": "Data",
+   "label": "اندازه"
+  },
+  {
+   "description": "خالی یعنی مقدار پیش‌فرض عمومی",
+   "fieldname": "icon_style_override",
+   "fieldtype": "Data",
+   "label": "سبک آیکون"
   },
   {
    "fieldname": "categories_section",

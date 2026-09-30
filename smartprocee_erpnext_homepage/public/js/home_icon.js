@@ -12,6 +12,10 @@ globalThis.SP_HOME_GAP_MAX = 48;
 	root.sp_home_folder_icon_mode = api.sp_home_folder_icon_mode;
 	root.sp_home_folder_members = api.sp_home_folder_members;
 	root.sp_home_folder_face = api.sp_home_folder_face;
+	root.sp_home_slot_index = api.sp_home_slot_index;
+	root.sp_home_icon_href = api.sp_home_icon_href;
+	root.sp_home_link_target = api.sp_home_link_target;
+	root.sp_home_effective_items = api.sp_home_effective_items;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
 	function sp_home_resolve_icon(item, bundledUrl) {
 		item = item || {};
@@ -119,16 +123,112 @@ globalThis.SP_HOME_GAP_MAX = 48;
 			return Object.assign({ mode }, markup);
 		}
 		const members = sp_home_folder_members(folder, items);
+		if (!members.length) {
+			const glyph = typeof frappe !== "undefined" && frappe.utils?.icon ? frappe.utils.icon("folder", "lg") : "";
+			return {
+				mode: "empty",
+				className: "is-folder",
+				html: `<span class="sp-folder-face is-empty">${glyph}</span>`,
+			};
+		}
 		const cells = members.map((item) => {
 			const markup = markup_for(item);
 			const style = `${markup.background ? `background:${markup.background};` : ""}${markup.stroke ? `--icon-stroke:${markup.stroke};` : ""}`;
 			return `<span class="sp-folder-preview-cell ${markup.className || ""}" style="${style}">${markup.html || ""}</span>`;
 		}).join("");
 		return {
-			mode: members.length ? "preview" : "empty",
+			mode: "preview",
 			className: "is-folder",
 			html: `<span class="sp-folder-face"><span class="sp-folder-preview" data-count="${members.length}">${cells}</span></span>`,
 		};
+	}
+
+	function sp_home_insertion_index(cards, pointer, rtl) {
+		const list = cards || [];
+		if (!list.length) return 0;
+		const x = pointer.x;
+		const y = pointer.y;
+		const rows = [];
+		list.forEach((card, index) => {
+			const previous = rows.length ? rows[rows.length - 1][0].card : null;
+			const split = !previous || Math.abs(card.top - previous.top) > Math.max(card.height, previous.height) * 0.45;
+			if (split) rows.push([]);
+			rows[rows.length - 1].push({ index, card });
+		});
+		const bounds = rows.map((row) => {
+			const top = Math.min(...row.map((entry) => entry.card.top));
+			const bottom = Math.max(...row.map((entry) => entry.card.top + entry.card.height));
+			return { top, bottom };
+		});
+		let chosen = 0;
+		for (let i = 0; i < rows.length; i++) {
+			const above = i === 0 ? Number.NEGATIVE_INFINITY : (bounds[i - 1].bottom + bounds[i].top) / 2;
+			const below = i === rows.length - 1 ? Number.POSITIVE_INFINITY : (bounds[i].bottom + bounds[i + 1].top) / 2;
+			if (y >= above && y < below) {
+				chosen = i;
+				break;
+			}
+		}
+		const row = rows[chosen];
+		const centers = row.map((entry) => entry.card.left + entry.card.width / 2);
+		const start = row[0].index;
+		if (rtl !== false) {
+			if (x >= centers[0]) return start;
+			if (x <= centers[centers.length - 1]) return row[row.length - 1].index + 1;
+			for (let i = 0; i < centers.length - 1; i++) {
+				if (centers[i] >= x && x >= centers[i + 1]) return row[i].index + 1;
+			}
+			return row[row.length - 1].index + 1;
+		}
+		if (x <= centers[0]) return start;
+		if (x >= centers[centers.length - 1]) return row[row.length - 1].index + 1;
+		for (let i = 0; i < centers.length - 1; i++) {
+			if (centers[i] <= x && x <= centers[i + 1]) return row[i].index + 1;
+		}
+		return row[row.length - 1].index + 1;
+	}
+
+	// `rects` is the visible row as drawn, including the slot at `slotAt` (-1 when the
+	// slot is in another grid). The result indexes the cards without the slot, so the
+	// hit test always runs on the layout the user sees.
+	function sp_home_slot_index(rects, slotAt, pointer, rtl) {
+		const index = sp_home_insertion_index(rects, pointer, rtl);
+		return slotAt >= 0 && index > slotAt ? index - 1 : index;
+	}
+
+	// A Desktop Icon link comes from Frappe's own resolver (Workspace Sidebar, Report,
+	// URL, External). Guessing /app/<link_to> breaks icons such as "System", whose
+	// sidebar has no page or workspace with that name.
+	function sp_home_icon_href(item, nativeIcon, routeForIcon) {
+		item = item || {};
+		if (item.custom_link) return item.custom_link;
+		const icon = nativeIcon || item;
+		if (typeof routeForIcon === "function" && icon.label) {
+			try {
+				const route = routeForIcon(icon);
+				if (route) return route;
+			} catch (_) { /* Frappe could not resolve this icon. */ }
+		}
+		if (icon.link_type === "External" && icon.link) return icon.link;
+		return "";
+	}
+
+	// Native Frappe keeps Desk routes in the current tab; only a URL on another origin opens a new one.
+	function sp_home_link_target(href, origin) {
+		if (!/^https?:\/\//i.test(href || "")) return "";
+		try {
+			return new URL(href).origin === origin ? "" : "_blank";
+		} catch (_) {
+			return "_blank";
+		}
+	}
+
+	// Frappe hides a Desktop Icon it cannot route (for example an empty sidebar). Folders and
+	// icons that the native grid still draws keep their own behaviour.
+	function sp_home_effective_items(items, hrefFor, nativeShown) {
+		return (items || []).filter(
+			(item) => item.icon_type === "Folder" || (nativeShown && nativeShown(item)) || !!hrefFor(item)
+		);
 	}
 
 	return {
@@ -137,5 +237,10 @@ globalThis.SP_HOME_GAP_MAX = 48;
 		sp_home_folder_icon_mode,
 		sp_home_folder_members,
 		sp_home_folder_face,
+		sp_home_insertion_index,
+		sp_home_slot_index,
+		sp_home_icon_href,
+		sp_home_link_target,
+		sp_home_effective_items,
 	};
 });

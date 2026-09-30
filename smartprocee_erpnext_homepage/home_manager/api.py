@@ -13,6 +13,14 @@ UNCATEGORIZED = "عمومی"
 ICON_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 GAP_MIN = -23
 GAP_MAX = 48
+_METRIC_FIELDS = (
+	("columns", "columns_override", "columns"),
+	("gap_x", "gap_x_override", "gap"),
+	("gap_y", "gap_y_override", "gap"),
+	("default_shape", "default_shape_override", "shape"),
+	("default_size", "default_size_override", "size"),
+	("icon_style", "icon_style_override", "style"),
+)
 
 
 def _require_manager():
@@ -65,7 +73,9 @@ def get_my_layout():
 	layout = _resolve_layout(user)
 	layout["items"] = [item for item in layout["items"] if not item.get("globally_hidden")]
 	layout["items"] = _sort_items(layout["items"], layout["categories"])
-	return _filter_inaccessible(layout)
+	layout = _filter_inaccessible(layout)
+	layout["can_publish_global"] = 1 if "System Manager" in frappe.get_roles() else 0
+	return layout
 
 
 @frappe.whitelist()
@@ -150,7 +160,9 @@ def save_my_layout(payload=None):
 		if folder["folder_name"] not in global_folders:
 			continue
 		folders.append(folder)
+	renamed = _submission_category_renames(prepared, global_layout)
 	prepared, folders = _keep_unseen_preferences(doc, prepared, folders, global_layout)
+	_apply_submission_renames(prepared, folders, renamed, global_layout)
 
 	names = _category_names(data.get("categories"), prepared)
 	for folder in folders:
@@ -168,8 +180,24 @@ def save_my_layout(payload=None):
 	doc.set("items", [])
 	for row in prepared:
 		doc.append("items", row)
+	_write_metric_overrides(doc, data, global_layout)
 	doc.save(ignore_permissions=True)
 	_publish_refresh("personal", user)
+	return get_my_layout()
+
+
+@frappe.whitelist()
+def save_as_global_default(payload=None):
+	"""Save the submitted layout as SP Home Settings and clear only this user's preference."""
+	_require_manager()
+	user = _session_user()
+	save_layout(payload)
+	if frappe.db.exists("SP Home Preference", user):
+		owned = frappe.db.get_value("SP Home Preference", user, "user")
+		if owned != user:
+			frappe.throw("چیدمان کاربر دیگری قابل ویرایش نیست.", frappe.PermissionError)
+		frappe.delete_doc("SP Home Preference", user, ignore_permissions=True)
+		_publish_refresh("personal", user)
 	return get_my_layout()
 
 
@@ -404,14 +432,58 @@ def _keep_unseen_preferences(doc, prepared, folders, global_layout):
 	return prepared, folders
 
 
+def _submission_category_renames(prepared, global_layout):
+	"""Map a global category to one new name when every submitted icon left it."""
+	global_category = {
+		item.get("name"): (item.get("category") or UNCATEGORIZED)
+		for item in (global_layout.get("items") or [])
+	}
+	by_origin = {}
+	for row in prepared:
+		origin = global_category.get(row.get("desktop_icon"))
+		if not origin:
+			continue
+		by_origin.setdefault(origin, set()).add((row.get("category") or UNCATEGORIZED).strip() or UNCATEGORIZED)
+	renamed = {}
+	for origin, targets in by_origin.items():
+		if origin in targets or len(targets) != 1:
+			continue
+		target = next(iter(targets))
+		if target != origin:
+			renamed[origin] = target
+	return renamed
+
+
+def _apply_submission_renames(prepared, folders, renamed, global_layout):
+	if not renamed:
+		return
+	global_category = {
+		item.get("name"): (item.get("category") or UNCATEGORIZED)
+		for item in (global_layout.get("items") or [])
+	}
+	for folder in global_layout.get("folders") or []:
+		global_category[f"folder:{folder.get('folder_name') or ''}"] = folder.get("category") or UNCATEGORIZED
+	for row in prepared:
+		origin = global_category.get(row.get("desktop_icon"))
+		current = (row.get("category") or UNCATEGORIZED).strip() or UNCATEGORIZED
+		if origin in renamed and current == origin:
+			row["category"] = renamed[origin]
+	for folder in folders:
+		origin = global_category.get(f"folder:{folder.get('folder_name') or ''}")
+		current = (folder.get("category") or UNCATEGORIZED).strip() or UNCATEGORIZED
+		if origin in renamed and current == origin:
+			folder["category"] = renamed[origin]
+
+
 def _resolve_layout(user):
 	layout = _global_layout()
+	baseline = _metric_values(layout)
 	layout["active"] = 1 if _is_active_for(user, layout) else 0
 	layout["personalized"] = 0
 	preference = _read_preference(user)
-	if not preference:
-		return layout
-	return _apply_preference(layout, preference)
+	if preference:
+		layout = _apply_preference(layout, preference)
+	return _apply_metric_overrides(layout, preference, baseline)
 
 
 def _global_layout():
@@ -487,6 +559,13 @@ def _apply_preference(layout, preference):
 		category = (row.category or "").strip()
 		if category and category not in global_set:
 			personal_names.add(category)
+	global_members = {}
+	for item in layout.get("items") or []:
+		global_members.setdefault(item.get("category") or UNCATEGORIZED, set()).add(item.get("name"))
+	for folder in layout.get("folders") or []:
+		global_members.setdefault(folder.get("category") or UNCATEGORIZED, set()).add(
+			f"folder:{folder.get('folder_name') or ''}"
+		)
 	names = []
 	for name in _stored_category_names(preference.categories):
 		# A preference category row does not recreate a deleted global category.
@@ -494,9 +573,6 @@ def _apply_preference(layout, preference):
 		if name in global_set or name in personal_names:
 			if name not in names:
 				names.append(name)
-	for name in global_names:
-		if name not in names:
-			names.append(name)
 	by_icon = {row.desktop_icon: row for row in (preference.items or [])}
 	for item in layout["items"]:
 		row = by_icon.get(item["name"])
@@ -538,10 +614,93 @@ def _apply_preference(layout, preference):
 			if category not in names:
 				names.append(category)
 		folder["sequence"] = cint(row.sequence)
+	names = [
+		name for name in names
+		if name not in global_set or _global_category_remains(name, global_members, layout)
+	]
+	for name in global_names:
+		if name not in names and _global_category_remains(name, global_members, layout):
+			names.append(name)
 	layout["categories"] = names
 	layout["items"] = _sort_items(layout["items"], names)
 	layout["personalized"] = 1
 	return _annotate_folders(layout)
+
+
+def _global_category_remains(name, global_members, layout):
+	"""Keep an unused global category, but not one whose icons were all moved away."""
+	members = global_members.get(name) or set()
+	if not members:
+		return True
+	allowed = _accessible_icon_names()
+	for item in layout.get("items") or []:
+		if item.get("globally_hidden"):
+			continue
+		if allowed is not None and item.get("name") not in allowed:
+			continue
+		if item.get("name") in members and (item.get("category") or UNCATEGORIZED) == name:
+			return True
+	for folder in layout.get("folders") or []:
+		key = f"folder:{folder.get('folder_name') or ''}"
+		if key in members and (folder.get("category") or UNCATEGORIZED) == name:
+			return True
+	return False
+
+
+def _metric_values(layout):
+	return {
+		"columns": _clamp_columns(layout.get("columns")),
+		"gap_x": _clamp_gap(layout.get("gap_x"), 8),
+		"gap_y": _clamp_gap(layout.get("gap_y"), 8),
+		"default_shape": layout.get("default_shape") or "rounded",
+		"default_size": layout.get("default_size") or "medium",
+		"icon_style": layout.get("icon_style") or "Solid",
+	}
+
+
+def _coerce_metric(key, value, fallback):
+	if key == "columns":
+		return _clamp_columns(value if value not in (None, "") else fallback)
+	if key in ("gap_x", "gap_y"):
+		return _clamp_gap(value if value not in (None, "") else fallback, fallback)
+	if key == "default_shape":
+		return value if value in ("rounded", "circle", "square") else fallback
+	if key == "default_size":
+		return value if value in ("small", "medium", "large", "xlarge") else fallback
+	if key == "icon_style":
+		return value if value in ("Solid", "Subtle") else fallback
+	return fallback
+
+
+def _apply_metric_overrides(layout, preference, baseline):
+	layout["global_metrics"] = dict(baseline)
+	layout["metric_overrides"] = {key: None for key, _field, _kind in _METRIC_FIELDS}
+	if preference:
+		for key, field, _kind in _METRIC_FIELDS:
+			raw = (preference.get(field) or "").strip()
+			if not raw:
+				continue
+			value = _coerce_metric(key, raw, baseline[key])
+			if value == baseline[key]:
+				continue
+			layout[key] = value
+			layout["metric_overrides"][key] = value
+			layout["personalized"] = 1
+	for item in layout.get("items") or []:
+		if item.get("use_custom_style"):
+			continue
+		item["shape"] = layout.get("default_shape") or "rounded"
+		item["size"] = layout.get("default_size") or "medium"
+	return _annotate_folders(layout)
+
+
+def _write_metric_overrides(doc, data, global_layout):
+	baseline = _metric_values(global_layout)
+	for key, field, _kind in _METRIC_FIELDS:
+		if key not in data:
+			continue
+		value = _coerce_metric(key, data.get(key), baseline[key])
+		doc.set(field, "" if value == baseline[key] else str(value))
 
 
 def _presentation(layout):
@@ -873,11 +1032,28 @@ def _owned_icon_names():
 	}
 
 
+def _drop_missing_icon_rows(doc):
+	"""A Desktop Icon deleted or renamed outside this app leaves rows that fail link validation."""
+	for fieldname in ("styles", "items", "owned_icons"):
+		rows = list(doc.get(fieldname) or [])
+		names = {row.desktop_icon for row in rows if row.desktop_icon}
+		if not names:
+			continue
+		existing = set(frappe.get_all("Desktop Icon", filters={"name": ["in", list(names)]}, pluck="name"))
+		kept = [row for row in rows if row.desktop_icon in existing]
+		if len(kept) == len(rows):
+			continue
+		doc.set(fieldname, kept)
+		for index, row in enumerate(doc.get(fieldname), start=1):
+			row.idx = index
+
+
 def _record_owned_icon(name):
 	settings = _get_settings()
 	if any((row.desktop_icon or "") == name for row in (settings.get("owned_icons") or [])):
 		return
 	settings.append("owned_icons", {"desktop_icon": name})
+	_drop_missing_icon_rows(settings)
 	settings.save(ignore_permissions=True)
 
 
@@ -924,6 +1100,7 @@ def _remove_owned_icon_references(name):
 	settings.set("owned_icons", [])
 	for row in kept_owned:
 		settings.append("owned_icons", row)
+	_drop_missing_icon_rows(settings)
 	settings.save(ignore_permissions=True)
 
 	if not frappe.db.table_exists("SP Home Preference Item"):
@@ -954,6 +1131,7 @@ def _remove_owned_icon_references(name):
 		doc.set("items", [])
 		for row in kept_items:
 			doc.append("items", row)
+		_drop_missing_icon_rows(doc)
 		doc.save(ignore_permissions=True)
 
 
@@ -989,6 +1167,7 @@ def _forget_removed_categories(previous, saved_names):
 				row.category = ""
 				changed = True
 		if changed:
+			_drop_missing_icon_rows(doc)
 			doc.save(ignore_permissions=True)
 
 
@@ -1009,6 +1188,7 @@ def _retarget_preferences(renames, saved_names):
 	for name in frappe.get_all("SP Home Preference", pluck="name"):
 		doc = frappe.get_doc("SP Home Preference", name)
 		if _rewrite_preference_categories(doc, pairs):
+			_drop_missing_icon_rows(doc)
 			doc.save(ignore_permissions=True)
 
 

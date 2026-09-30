@@ -3,7 +3,7 @@
 import frappe
 from frappe.utils import cint
 
-from smartprocee_erpnext_homepage.home_manager.api import GAP_MAX, GAP_MIN, UNCATEGORIZED
+from smartprocee_erpnext_homepage.home_manager.api import GAP_MAX, GAP_MIN, UNCATEGORIZED, _drop_missing_icon_rows
 
 
 def sync_home_layout():
@@ -16,6 +16,7 @@ def sync_home_layout():
 	changed = _remap_gaps(settings)
 	changed = _ensure_categories(settings) or changed
 	if changed:
+		_drop_missing_icon_rows(settings)
 		settings.save(ignore_permissions=True)
 
 

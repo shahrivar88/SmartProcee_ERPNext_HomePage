@@ -2,29 +2,35 @@ const SP_HOME_GAP_MIN = window.SP_HOME_GAP_MIN;
 const SP_HOME_GAP_MAX = window.SP_HOME_GAP_MAX;
 
 class SPHomeManager {
-	constructor(page, options) {
+	constructor(page) {
 		this.page = page;
-		this.mode = options?.mode === "personal" ? "personal" : "global";
 		this.state = null;
+		this.can_publish = false;
 		this.sortables = [];
-		this.drop_folder = "";
-		this.suppress_folder_click = false;
+		this.dragging = false;
 		this.setup_actions();
 		this.page.main.html(`<div class="sp-home-editor"></div>`);
 		this.$root = this.page.main.find(".sp-home-editor");
+		this.$root.on("pointerdown", ".sp-home-card", (event) => this.on_card_pointer_down(event));
+		this.$root.on("click", ".sp-home-card", (event) => this.on_card_click(event));
+		// A native image/text drag cancels the pointer stream, so the slot would stop following.
+		this.$root.on("dragstart", ".sp-home-card", (event) => event.preventDefault());
 	}
 
 	setup_actions() {
-		const save_label = this.mode === "personal" ? __("ذخیره چیدمان من") : __("ذخیره و اعمال");
-		this.page.set_primary_action(save_label, () => this.save());
-		this.install_home_link();
-		if (this.mode === "global") {
-			this.page.add_inner_button(__("آیکون جدید"), () => this.prompt_new_icon());
-			this.page.add_inner_button(__("پوشه جدید"), () => this.prompt_new_folder());
-		} else {
-			this.page.add_inner_button(__("بازنشانی به چیدمان پیش‌فرض"), () => this.reset_personal());
+		this.page.set_primary_action(__("ذخیره چیدمان من"), () => this.save());
+	}
+
+	ensure_menu() {
+		if (this.menu_ready) return;
+		this.menu_ready = true;
+		this.page.add_menu_item(__("صفحه اصلی"), () => {})
+			.attr("href", this.home_href())
+			.removeAttr("onclick");
+		if (this.can_publish) {
+			this.page.add_menu_item(__("ذخیره به عنوان پیش‌فرض"), () => this.publish_global());
 		}
-		this.page.add_inner_button(__("دسته جدید"), () => this.prompt_new_category());
+		this.page.add_menu_item(__("بازنشانی چیدمان پیش‌فرض"), () => this.reset_personal());
 	}
 
 	home_href() {
@@ -37,55 +43,45 @@ class SPHomeManager {
 		return "/desk";
 	}
 
-	install_home_link() {
-		const actions = this.page.standard_actions;
-		if (!actions || !actions.length) return;
-		actions.find(".sp-home-go-desktop").remove();
-		const link = document.createElement("a");
-		link.className = "btn btn-secondary btn-default btn-sm sp-home-go-desktop";
-		link.href = this.home_href();
-		link.textContent = __("رفتن به صفحه اصلی");
-		actions.prepend(link);
-	}
-
 	load() {
-		const method = this.mode === "personal"
-			? "smartprocee_erpnext_homepage.home_manager.api.get_my_layout"
-			: "smartprocee_erpnext_homepage.home_manager.api.get_layout";
 		frappe.call({
-			method,
+			method: "smartprocee_erpnext_homepage.home_manager.api.get_my_layout",
 			freeze: true,
 			freeze_message: __("در حال بارگذاری صفحه اصلی..."),
 			callback: (r) => {
-				this.state = r.message;
-				this.state.categories = this.state.categories || [];
-				this.state.folders = this.state.folders || [];
-				this.remember_categories();
-				this.render();
+				this.apply_state(r.message);
 			},
 		});
+	}
+
+	apply_state(message) {
+		this.state = message;
+		this.state.categories = this.state.categories || [];
+		this.state.folders = this.state.folders || [];
+		this.can_publish = !!this.state.can_publish_global;
+		this.ensure_menu();
+		this.remember_categories();
+		this.render();
 	}
 
 	render() {
 		if (!this.state) return;
 		this.sortables.forEach((sortable) => sortable.destroy());
 		this.sortables = [];
-		const personal = this.mode === "personal";
-		const disabled = personal ? "disabled" : "";
+		const locked = this.can_publish ? "" : "disabled";
 		this.$root.html(`
 			<div class="sp-home-toolbar">
-				${personal ? "" : `
 				<label class="sp-toggle">
-					<input type="checkbox" data-field="enable_custom_styles" ${this.state.enabled ? "checked" : ""}>
+					<input type="checkbox" data-field="enable_custom_styles" ${this.state.enabled ? "checked" : ""} ${locked}>
 					<span>اعمال ظاهر سفارشی روی صفحه اصلی</span>
 				</label>
 				<label class="sp-toggle">
-					<input type="checkbox" data-field="apply_to_all_users" ${this.state.apply_to_all_users ? "checked" : ""}>
+					<input type="checkbox" data-field="apply_to_all_users" ${this.state.apply_to_all_users ? "checked" : ""} ${locked}>
 					<span>اعمال برای همه کاربران</span>
-				</label>`}
+				</label>
 				<label>
 					شکل پیش‌فرض
-					<select data-field="default_shape" ${disabled}>
+					<select data-field="default_shape">
 						<option value="rounded">گوشه‌گرد</option>
 						<option value="circle">دایره</option>
 						<option value="square">مربع</option>
@@ -93,7 +89,7 @@ class SPHomeManager {
 				</label>
 				<label>
 					اندازه پیش‌فرض
-					<select data-field="default_size" ${disabled}>
+					<select data-field="default_size">
 						<option value="small">کوچک</option>
 						<option value="medium">متوسط</option>
 						<option value="large">بزرگ</option>
@@ -102,29 +98,33 @@ class SPHomeManager {
 				</label>
 				<label>
 					سبک آیکون
-					<select data-field="icon_style" ${disabled}>
+					<select data-field="icon_style">
 						<option value="Solid">پررنگ</option>
 						<option value="Subtle">ملایم</option>
 					</select>
 				</label>
 				<label>
 					حداکثر ستون
-					<input type="number" min="2" max="10" data-field="columns" ${disabled}>
+					<input type="number" min="2" max="10" data-field="columns">
 				</label>
 				<label>
 					فاصله افقی
-					<input type="number" min="${SP_HOME_GAP_MIN}" max="${SP_HOME_GAP_MAX}" step="1" data-field="gap_x" ${disabled}>
+					<input type="number" min="${SP_HOME_GAP_MIN}" max="${SP_HOME_GAP_MAX}" step="1" data-field="gap_x">
 				</label>
 				<label>
 					فاصله عمودی
-					<input type="number" min="${SP_HOME_GAP_MIN}" max="${SP_HOME_GAP_MAX}" step="1" data-field="gap_y" ${disabled}>
+					<input type="number" min="${SP_HOME_GAP_MIN}" max="${SP_HOME_GAP_MAX}" step="1" data-field="gap_y">
 				</label>
 			</div>
-			<div class="sp-home-hint">${personal
-				? "این چیدمان فقط برای شما ذخیره می‌شود. دستهٔ خالی باقی می‌ماند. بازنشانی، چیدمان مدیر را برمی‌گرداند."
-				: "این صفحه پیش‌فرض همهٔ کاربرانی است که چیدمان شخصی ندارند. دسته را از دستگیره جابه‌جا کنید. دستهٔ خالی را می‌توان حذف کرد."}</div>
+			${this.create_actions_html()}
 			<div class="sp-home-board"></div>
 		`);
+		this.$root.find(".sp-home-create-actions [data-create]").on("click", (event) => {
+			const kind = event.currentTarget.dataset.create;
+			if (kind === "category") this.prompt_new_category();
+			else if (kind === "icon") this.prompt_new_icon();
+			else if (kind === "folder") this.prompt_new_folder();
+		});
 		this.$root.find("[data-field=default_shape]").val(this.state.default_shape);
 		this.$root.find("[data-field=default_size]").val(this.state.default_size);
 		this.$root.find("[data-field=icon_style]").val(this.state.icon_style);
@@ -136,9 +136,9 @@ class SPHomeManager {
 		this.$root[0].style.setProperty("--sp-gap-y", `${this.state.gap_y ?? 8}px`);
 
 		this.$root.find("[data-field]").on("input change", (e) => {
-			if (personal) return;
 			const $el = $(e.currentTarget);
 			const field = $el.data("field");
+			if (!this.can_publish && (field === "enable_custom_styles" || field === "apply_to_all_users")) return;
 			if ($el.is(":checkbox")) {
 				this.state[field === "enable_custom_styles" ? "enabled" : field] = $el.is(":checked") ? 1 : 0;
 				return;
@@ -170,6 +170,19 @@ class SPHomeManager {
 			$board.append(this.render_category(category));
 		});
 		this.bind_sortable();
+	}
+
+	create_actions_html() {
+		const actions = [["category", "list-plus", __("دسته جدید")]];
+		if (this.can_publish) {
+			actions.push(["icon", "square-plus", __("آیکون جدید")], ["folder", "folder-plus", __("پوشه جدید")]);
+		}
+		const buttons = actions.map(([kind, icon, label]) => `
+			<button type="button" class="btn btn-default btn-sm sp-home-create" data-create="${kind}">
+				${frappe.utils.icon(icon, "sm")}
+				<span>${frappe.utils.escape_html(label)}</span>
+			</button>`).join("");
+		return `<div class="sp-home-create-actions" role="group" aria-label="${frappe.utils.escape_html(__("افزودن"))}">${buttons}</div>`;
 	}
 
 	category_names() {
@@ -217,7 +230,7 @@ class SPHomeManager {
 			...items.filter((item) => !folder_names.has(item.folder)).map((item) => ({ kind: "icon", sequence: Number(item.sequence) || 0, item })),
 			...folders.map((folder) => ({ kind: "folder", sequence: Number(folder.sequence) || 0, folder })),
 		].sort((a, b) => a.sequence - b.sequence || (a.kind === "folder" ? -1 : 1));
-		const can_delete = this.mode === "global" && !items.length && !folders.length;
+		const can_delete = this.can_publish && !items.length && !folders.length;
 		const $section = $(`
 			<section class="sp-home-category" data-category="${frappe.utils.escape_html(category)}">
 				<header>
@@ -291,7 +304,6 @@ class SPHomeManager {
 				<div class="sp-home-card-title">${frappe.utils.escape_html(label)}</div>
 			</article>
 		`);
-		$card.on("click", () => this.edit_item(item));
 		$card.find(".sp-home-delete").on("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
@@ -320,47 +332,37 @@ class SPHomeManager {
 	}
 
 	render_folder(folder) {
-		const personal = this.mode === "personal";
 		const face = this.folder_face(folder);
 		const shape = this.state.default_shape || "rounded";
 		const size = this.state.default_size || "medium";
 		const style = `${face.background ? `background:${face.background}` : ""}${face.stroke ? `;--icon-stroke:${face.stroke}` : ""}`;
-		const tools = personal ? "" : `
-			<div class="sp-folder-tools">
-				<button class="sp-folder-rename" type="button" title="تغییر نام" aria-label="تغییر نام">✎</button>
-				<button class="sp-folder-icon" type="button" title="آیکون پوشه" aria-label="آیکون پوشه">▣</button>
-				<button class="sp-folder-delete" type="button" title="حذف پوشه" aria-label="حذف پوشه">×</button>
-			</div>`;
-		const $folder = $(`
+		return $(`
 			<article class="sp-home-card sp-home-folder" data-folder="${frappe.utils.escape_html(folder.folder_name)}" data-shape="${shape}" data-size="${size}">
-				${tools}
 				<div class="sp-home-card-icon ${face.className || ""}" style="${style}">${face.html || ""}</div>
 				<div class="sp-home-card-title">${frappe.utils.escape_html(folder.folder_name)}</div>
 			</article>
 		`);
-		$folder.on("click", (event) => {
-			if (this.suppress_folder_click) return;
-			if ($(event.target).closest(".sp-folder-tools").length) return;
-			this.open_folder_dialog(folder);
+	}
+
+	folder_dialog_actions(folder, dialog) {
+		const bar = document.createElement("div");
+		bar.className = "sp-folder-dialog-actions";
+		[
+			["edit", __("تغییر نام"), () => this.rename_folder(folder)],
+			["image", __("آیکون پوشه"), () => this.edit_folder_icon(folder)],
+			["trash-2", __("حذف پوشه"), () => this.delete_folder(folder)],
+		].forEach(([icon, label, action]) => {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "btn btn-default btn-xs";
+			button.innerHTML = `${frappe.utils.icon(icon, "xs")}<span>${frappe.utils.escape_html(label)}</span>`;
+			button.addEventListener("click", () => {
+				dialog.hide();
+				action();
+			});
+			bar.append(button);
 		});
-		if (!personal) {
-			$folder.find(".sp-folder-rename").on("click", (event) => {
-				event.preventDefault();
-				event.stopPropagation();
-				this.rename_folder(folder);
-			});
-			$folder.find(".sp-folder-delete").on("click", (event) => {
-				event.preventDefault();
-				event.stopPropagation();
-				this.delete_folder(folder);
-			});
-			$folder.find(".sp-folder-icon").on("click", (event) => {
-				event.preventDefault();
-				event.stopPropagation();
-				this.edit_folder_icon(folder);
-			});
-		}
-		return $folder;
+		return bar;
 	}
 
 	rename_folder(folder) {
@@ -395,6 +397,7 @@ class SPHomeManager {
 		note.textContent = __("ترتیب را با کشیدن تغییر دهید. برای برگرداندن آیکون به دسته، «بازگشت به دسته» را بزنید.");
 		const list = document.createElement("div");
 		list.className = "sp-folder-dialog-list";
+		if (this.can_publish) dialog.$body.append(this.folder_dialog_actions(folder, dialog));
 		dialog.$body.append(note, list);
 		const members = (this.state.items || [])
 			.filter((item) => item.folder === folder.folder_name)
@@ -553,95 +556,247 @@ class SPHomeManager {
 		);
 	}
 
+	on_card_click(event) {
+		if (this.dragging) {
+			this.dragging = false;
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		if ($(event.target).closest(".sp-home-delete").length) return;
+		const card = event.currentTarget;
+		if (card.classList.contains("sp-home-folder")) {
+			const folder = (this.state.folders || []).find((row) => row.folder_name === card.dataset.folder);
+			if (folder) this.open_folder_dialog(folder);
+			return;
+		}
+		const item = (this.state.items || []).find((row) => row.name === card.dataset.name);
+		if (item) this.edit_item(item);
+	}
+
 	bind_sortable() {
 		if (typeof Sortable === "undefined") return;
 		const board = this.$root.find(".sp-home-board").get(0);
-		if (board) {
-			this.sortables.push(new Sortable(board, {
-				animation: 150,
-				handle: ".sp-category-handle",
-				draggable: ".sp-home-category",
-				onEnd: () => this.sync_from_dom(),
-			}));
-		}
-		const icon_group = {
-			name: "sp-home-icons",
-			pull: true,
-			put: (to, from, drag) => drag.classList.contains("sp-home-card"),
+		if (!board) return;
+		this.sortables.push(new Sortable(board, {
+			animation: 150,
+			handle: ".sp-category-handle",
+			draggable: ".sp-home-category",
+			onEnd: () => {
+				const names = [...board.querySelectorAll(":scope > .sp-home-category")].map((section) => (
+					($(section).find(".sp-category-title").val() || "عمومی").trim()
+				));
+				this.state.categories = names.length ? names : ["عمومی"];
+				this.render();
+			},
+		}));
+	}
+
+	on_card_pointer_down(event) {
+		if (event.button !== 0) return;
+		if ($(event.target).closest(".sp-home-delete, a, button, input").length) return;
+		this.dragging = false;
+		const card = event.currentTarget;
+		this.drag_session = {
+			card,
+			startX: event.clientX,
+			startY: event.clientY,
+			moved: false,
 		};
-		this.$root.find(".sp-home-category > .sp-home-mixed").each((_, el) => {
-			this.sortables.push(new Sortable(el, {
-				group: icon_group,
-				animation: 150,
-				forceFallback: true,
-				fallbackOnBody: true,
-				fallbackTolerance: 4,
-				draggable: ".sp-home-card, .sp-home-folder",
-				filter: ".sp-folder-tools, .sp-folder-tools *, .sp-home-delete",
-				preventOnFilter: false,
-				onStart: (evt) => {
-					this.drop_folder = "";
-					const point = evt.originalEvent || {};
-					this.drag_origin = { x: point.clientX || 0, y: point.clientY || 0 };
-				},
-				onMove: (evt) => {
-					if (evt.dragged.classList.contains("sp-home-folder")) {
-						this.clear_drop_target();
-						return true;
-					}
-					const folder = this.folder_under_pointer(evt);
-					this.clear_drop_target();
-					if (!folder) {
-						this.drop_folder = "";
-						return true;
-					}
-					folder.classList.add("is-drop-target");
-					this.drop_folder = folder.dataset.folder || "";
-					return false;
-				},
-				onEnd: (evt) => {
-					const target = this.drop_folder;
-					const point = evt.originalEvent || {};
-					const origin = this.drag_origin || { x: point.clientX || 0, y: point.clientY || 0 };
-					const moved = Math.abs((point.clientX || 0) - origin.x) > 4 || Math.abs((point.clientY || 0) - origin.y) > 4;
-					this.clear_drop_target();
-					this.drop_folder = "";
-					if (moved || target) this.suppress_folder_click = true;
-					setTimeout(() => {
-						this.suppress_folder_click = false;
-					}, 0);
-					const dragged_item = (this.state.items || []).find((row) => row.name === evt.item.dataset.name);
-					if (target && evt.item.classList.contains("sp-home-card") && (!dragged_item || dragged_item.folder !== target)) {
-						this.move_into_folder(evt.item.dataset.name, target);
-						this.render();
-						return;
-					}
-					this.sync_from_dom();
-				},
-			}));
+		this._drag_move = (ev) => this.on_card_pointer_move(ev);
+		this._drag_up = (ev) => this.on_card_pointer_up(ev);
+		this._drag_cancel = () => this.on_card_pointer_cancel();
+		document.addEventListener("pointermove", this._drag_move);
+		document.addEventListener("pointerup", this._drag_up);
+		document.addEventListener("pointercancel", this._drag_cancel);
+	}
+
+	stop_drag_listeners() {
+		document.removeEventListener("pointermove", this._drag_move);
+		document.removeEventListener("pointerup", this._drag_up);
+		document.removeEventListener("pointercancel", this._drag_cancel);
+	}
+
+	on_card_pointer_cancel() {
+		this.stop_drag_listeners();
+		const session = this.drag_session;
+		this.drag_session = null;
+		this.dragging = false;
+		if (!session?.moved) return;
+		this.clear_drop_target();
+		this.release_lifted_card(session);
+		this.render();
+	}
+
+	on_card_pointer_move(event) {
+		const session = this.drag_session;
+		if (!session) return;
+		const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+		if (!session.moved && distance < 5) return;
+		if (!session.moved) {
+			session.moved = true;
+			this.dragging = true;
+			this.lift_card(session);
+		}
+		event.preventDefault();
+		this.place_insertion(session, event.clientX, event.clientY);
+	}
+
+	on_card_pointer_up() {
+		this.stop_drag_listeners();
+		const session = this.drag_session;
+		this.drag_session = null;
+		if (!session?.moved) {
+			this.dragging = false;
+			return;
+		}
+		const folder = session.folder || "";
+		this.clear_drop_target();
+		if (folder && !session.card.classList.contains("sp-home-folder")) {
+			this.move_into_folder(session.card.dataset.name, folder);
+		} else if (session.mixed) {
+			this.commit_insertion(session);
+		}
+		this.release_lifted_card(session);
+		this.render();
+	}
+
+	lift_card(session) {
+		const rect = session.card.getBoundingClientRect();
+		session.width = rect.width;
+		session.height = rect.height;
+		const slot = document.createElement("div");
+		slot.className = "sp-home-slot";
+		slot.style.flex = `0 0 ${rect.width}px`;
+		slot.style.width = `${rect.width}px`;
+		slot.style.height = `${rect.height}px`;
+		slot.style.boxSizing = "border-box";
+		slot.style.border = "2px dashed var(--primary)";
+		slot.style.borderRadius = "12px";
+		slot.style.pointerEvents = "none";
+		session.card.before(slot);
+		session.slot = slot;
+		session.mixed = session.card.parentElement;
+		const card = session.card;
+		card.classList.add("is-lifted");
+		card.style.position = "fixed";
+		card.style.zIndex = "1000";
+		card.style.pointerEvents = "none";
+		card.style.margin = "0";
+		card.style.width = `${rect.width}px`;
+		card.style.left = `${rect.left}px`;
+		card.style.top = `${rect.top}px`;
+		document.body.appendChild(card);
+	}
+
+	release_lifted_card(session) {
+		if (session?.card?.isConnected) session.card.remove();
+	}
+
+	place_insertion(session, x, y) {
+		session.card.style.left = `${x - session.width / 2}px`;
+		session.card.style.top = `${y - 24}px`;
+		const folder = session.card.classList.contains("sp-home-folder") ? null : this.folder_at_point(session.card, x, y);
+		this.clear_drop_target();
+		session.folder = folder ? (folder.dataset.folder || "") : "";
+		if (session.folder) {
+			folder.classList.add("is-drop-target");
+			return;
+		}
+		const mixed = this.mixed_under_pointer(x, y, session) || session.mixed;
+		session.mixed = mixed;
+		const visible = [...mixed.children].filter(
+			(el) => el === session.slot || (el.classList.contains("sp-home-card") && el !== session.card)
+		);
+		const rects = visible.map((el) => {
+			const rect = el.getBoundingClientRect();
+			return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
 		});
+		const rtl = document.documentElement.getAttribute("dir") !== "ltr";
+		const index = window.sp_home_slot_index(rects, visible.indexOf(session.slot), { x, y }, rtl);
+		const cards = visible.filter((el) => el !== session.slot);
+		const anchor = cards[index];
+		if (anchor) {
+			if (anchor.previousElementSibling !== session.slot) anchor.before(session.slot);
+		} else if (mixed.lastElementChild !== session.slot) {
+			mixed.append(session.slot);
+		}
+	}
+
+	mixed_under_pointer(x, y, session) {
+		const stack = document.elementsFromPoint(x, y) || [];
+		for (const el of stack) {
+			if (!el || el === session.card || session.card.contains(el)) continue;
+			const mixed = el.closest?.(".sp-home-category > .sp-home-mixed");
+			if (mixed && this.$root[0].contains(mixed)) return mixed;
+		}
+		return session.mixed;
+	}
+
+	commit_insertion(session) {
+		const category = ($(session.mixed).closest(".sp-home-category").find(".sp-category-title").val() || "عمومی").trim();
+		const cards = [...session.mixed.querySelectorAll(":scope > .sp-home-card")].filter((el) => el !== session.card);
+		const slot_index = [...session.mixed.children].filter((el) => el === session.slot || cards.includes(el)).indexOf(session.slot);
+		const key = this.card_key(session.card);
+		const moved = key.startsWith("folder:")
+			? (this.state.folders || []).find((row) => `folder:${row.folder_name}` === key)
+			: (this.state.items || []).find((row) => `icon:${row.name}` === key);
+		if (!moved) return;
+		const previous = moved.category || "عمومی";
+		moved.category = category;
+		if (!key.startsWith("folder:")) moved.folder = "";
+		else {
+			(this.state.items || []).forEach((item) => {
+				if (item.folder === moved.folder_name) item.category = category;
+			});
+		}
+		const entries = this.loose_entries(category).filter((entry) => entry.ref !== moved);
+		const index = Math.max(0, Math.min(slot_index < 0 ? entries.length : slot_index, entries.length));
+		entries.splice(index, 0, { ref: moved });
+		entries.forEach((entry, position) => {
+			entry.ref.sequence = position + 1;
+		});
+		if (previous !== category) {
+			this.loose_entries(previous).forEach((entry, position) => {
+				entry.ref.sequence = position + 1;
+			});
+		}
+	}
+
+	card_key(card) {
+		return card.classList.contains("sp-home-folder") ? `folder:${card.dataset.folder}` : `icon:${card.dataset.name}`;
+	}
+
+	loose_entries(category) {
+		const items = (this.state.items || []).filter((item) => item.icon_type !== "Folder" && (item.category || "عمومی") === category);
+		const folders = (this.state.folders || []).filter((folder) => (folder.category || "عمومی") === category);
+		const names = new Set(folders.map((folder) => folder.folder_name));
+		return [
+			...items.filter((item) => !names.has(item.folder)).map((item) => ({ kind: "icon", key: `icon:${item.name}`, sequence: Number(item.sequence) || 0, ref: item })),
+			...folders.map((folder) => ({ kind: "folder", key: `folder:${folder.folder_name}`, sequence: Number(folder.sequence) || 0, ref: folder })),
+		].sort((a, b) => a.sequence - b.sequence || (a.kind === "folder" ? -1 : 1));
 	}
 
 	clear_drop_target() {
 		this.$root.find(".sp-home-folder.is-drop-target").removeClass("is-drop-target");
 	}
 
-	folder_under_pointer(evt) {
-		const event = evt.originalEvent;
-		if (!event || event.clientX == null) return null;
-		const dragged = evt.dragged;
-		const stack = document.elementsFromPoint(event.clientX, event.clientY) || [];
-		for (const el of stack) {
-			if (!el || el === dragged || dragged.contains(el)) continue;
-			const folder = el.closest?.(".sp-home-category > .sp-home-mixed > .sp-home-folder");
-			if (folder) return folder;
-		}
-		const related = evt.related;
-		const folder = related && (related.classList?.contains("sp-home-folder") ? related : related.closest?.(".sp-home-folder"));
-		if (!folder || dragged.contains(folder)) return null;
+	folder_face_zone(folder, x, y) {
 		const rect = folder.getBoundingClientRect();
-		if (event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom) {
-			return folder;
+		if (!rect.width || !rect.height) return false;
+		const insetX = rect.width * 0.28;
+		const insetY = rect.height * 0.28;
+		return x >= rect.left + insetX && x <= rect.right - insetX && y >= rect.top + insetY && y <= rect.bottom - insetY;
+	}
+
+	folder_at_point(dragged, x, y) {
+		if (x == null || y == null) return null;
+		const stack = document.elementsFromPoint(x, y) || [];
+		for (const el of stack) {
+			if (!el || el === dragged || dragged?.contains(el)) continue;
+			const folder = el.closest?.(".sp-home-category > .sp-home-mixed > .sp-home-folder");
+			if (!folder || folder === dragged) continue;
+			if (this.folder_face_zone(folder, x, y)) return folder;
 		}
 		return null;
 	}
@@ -656,68 +811,18 @@ class SPHomeManager {
 		item.sequence = siblings.reduce((max, row) => Math.max(max, Number(row.sequence) || 0), 0) + 1;
 	}
 
-	sync_from_dom() {
-		const categories = [];
-		const next = [];
-		const seen = new Set();
-		this.$root.find(".sp-home-category").each((_, section) => {
-			const category = ($(section).find(".sp-category-title").val() || "عمومی").trim();
-			if (!categories.includes(category)) categories.push(category);
-			let sequence = 1;
-			$(section).children(".sp-home-mixed").children().each((__, node) => {
-				if (node.classList.contains("sp-home-card") && !node.classList.contains("sp-home-folder")) {
-					const item = this.state.items.find((row) => row.name === node.dataset.name);
-					if (!item || seen.has(item)) return;
-					item.category = category;
-					item.folder = "";
-					item.sequence = sequence++;
-					seen.add(item);
-					next.push(item);
-					return;
-				}
-				if (!node.classList.contains("sp-home-folder")) return;
-				const folder = (this.state.folders || []).find((row) => row.folder_name === node.dataset.folder);
-				if (!folder) return;
-				folder.category = category;
-				folder.sequence = sequence++;
-				this.state.items.forEach((item) => {
-					if (item.folder === folder.folder_name) item.category = category;
-				});
-			});
-		});
-		this.$root.find(".sp-home-folder-members").each((_, grid) => {
-			const folder_name = grid.dataset.folder || "";
-			let inner = 1;
-			$(grid).children(".sp-home-card").each((__, card) => {
-				const item = this.state.items.find((row) => row.name === card.dataset.name);
-				if (!item || seen.has(item)) return;
-				item.folder = folder_name;
-				item.sequence = inner++;
-				seen.add(item);
-				next.push(item);
-			});
-		});
-		this.state.items.forEach((item) => {
-			if (seen.has(item)) return;
-			if (!item.folder) item.sequence = 10000 + (Number(item.sequence) || 0);
-			next.push(item);
-		});
-		this.state.categories = categories.length ? categories : ["عمومی"];
-		this.state.items = next;
-	}
-
 	edit_item(item) {
 		const fields = [
 			{ fieldname: "custom_label", fieldtype: "Data", label: __("نام نمایشی"), default: item.custom_label || item.label },
 			{ fieldname: "category", fieldtype: "Data", label: __("دسته"), default: item.category || "عمومی" },
 		];
-		if (this.mode === "global") {
+		if (this.can_publish) {
 			fields.push({
 				fieldname: "custom_link",
 				fieldtype: "Data",
 				label: __("لینک"),
-				default: item.custom_link || item.link || (item.link_to ? `/app/${frappe.router.slug(item.link_to)}` : ""),
-				description: __("برای حفظ لینک فعلی تغییری ندهید."),
+				default: item.custom_link || "",
+				description: __("خالی بماند تا لینک استاندارد همین آیکون در فرپه استفاده شود."),
 			});
 		}
 		fields.push(
@@ -768,7 +873,7 @@ class SPHomeManager {
 				this.render();
 			},
 		});
-		if (this.mode === "global" && item.owned) {
+		if (this.can_publish && item.owned) {
 			dialog.set_secondary_action_label(__("حذف دائمی آیکون سفارشی"));
 			dialog.set_secondary_action(() => {
 				frappe.confirm(__("آیکون سفارشی «{0}» و داده‌های وابسته در مدیریت صفحه اصلی برای همیشه حذف شوند؟ این مخفی کردن نیست.", [item.custom_label || item.label]), () => {
@@ -819,10 +924,9 @@ class SPHomeManager {
 					method: "smartprocee_erpnext_homepage.home_manager.api.create_desktop_icon",
 					args: values,
 					freeze: true,
-					callback: (r) => {
-						this.state = r.message;
+					callback: () => {
 						dialog.hide();
-						this.render();
+						this.load();
 					},
 				});
 			},
@@ -830,40 +934,30 @@ class SPHomeManager {
 		dialog.show();
 	}
 
-	payload() {
-		this.sync_from_dom();
+	payload(for_global = false) {
 		const data = {
 			categories: this.state.categories || [],
 			folders: (this.state.folders || []).map((folder) => ({
 				folder_name: folder.folder_name,
 				category: folder.category || "عمومی",
 				sequence: Number(folder.sequence) || 0,
-				icon_name: this.mode === "personal" ? "" : (folder.icon_name || ""),
-				custom_icon_image: this.mode === "personal" ? "" : (folder.custom_icon_image || ""),
+				icon_name: for_global ? (folder.icon_name || "") : "",
+				custom_icon_image: for_global ? (folder.custom_icon_image || "") : "",
 			})),
 			items: (this.state.items || []).filter((item) => item.name),
+			columns: this.state.columns ?? 5,
+			gap_x: this.state.gap_x ?? 8,
+			gap_y: this.state.gap_y ?? 8,
+			default_shape: this.state.default_shape || "rounded",
+			default_size: this.state.default_size || "medium",
+			icon_style: this.state.icon_style || "Solid",
 		};
-		if (this.mode === "global") {
-			for (const field of ["columns", "gap_x", "gap_y"]) {
-				const value = Number(this.$root.find(`[data-field=${field}]`).val());
-				const minimum = field === "columns" ? 2 : SP_HOME_GAP_MIN;
-				const maximum = field === "columns" ? 10 : SP_HOME_GAP_MAX;
-				this.state[field] = Number.isFinite(value)
-					? Math.max(minimum, Math.min(maximum, Math.trunc(value)))
-					: (field === "columns" ? 5 : 8);
-			}
-			Object.assign(data, {
-				enable_custom_styles: this.state.enabled ? 1 : 0,
-				apply_to_all_users: this.state.apply_to_all_users ? 1 : 0,
-				default_shape: this.state.default_shape,
-				default_size: this.state.default_size,
-				icon_style: this.state.icon_style,
-				gap_x: this.state.gap_x ?? 8,
-				gap_y: this.state.gap_y ?? 8,
-				columns: this.state.columns ?? 5,
-				category_renames: this.category_renames(),
-			});
-		}
+		if (!for_global) return data;
+		Object.assign(data, {
+			enable_custom_styles: this.state.enabled ? 1 : 0,
+			apply_to_all_users: this.state.apply_to_all_users ? 1 : 0,
+			category_renames: this.category_renames(),
+		});
 		return data;
 	}
 
@@ -891,37 +985,48 @@ class SPHomeManager {
 	}
 
 	save() {
-		const method = this.mode === "personal"
-			? "smartprocee_erpnext_homepage.home_manager.api.save_my_layout"
-			: "smartprocee_erpnext_homepage.home_manager.api.save_layout";
 		frappe.call({
-			method,
-			args: { payload: JSON.stringify(this.payload()) },
+			method: "smartprocee_erpnext_homepage.home_manager.api.save_my_layout",
+			args: { payload: JSON.stringify(this.payload(false)) },
 			freeze: true,
-			freeze_message: __("در حال اعمال روی صفحه اصلی..."),
+			freeze_message: __("در حال ذخیره چیدمان شما..."),
 			callback: (r) => {
-				this.state = r.message;
-				this.remember_categories();
+				this.apply_state(r.message);
 				this.after_save();
 			},
 		});
 	}
 
-	reset_personal() {
-		frappe.confirm(__("چیدمان شخصی حذف شود و چیدمان پیش‌فرض مدیر برگردد؟"), () => {
+	publish_global() {
+		frappe.confirm(__("این چیدمان به‌عنوان پیش‌فرض عمومی ذخیره شود؟ فقط چیدمان شخصی شما پاک می‌شود."), () => {
 			frappe.call({
-				method: "smartprocee_erpnext_homepage.home_manager.api.reset_my_layout",
+				method: "smartprocee_erpnext_homepage.home_manager.api.save_as_global_default",
+				args: { payload: JSON.stringify(this.payload(true)) },
 				freeze: true,
+				freeze_message: __("در حال ذخیره پیش‌فرض عمومی..."),
 				callback: (r) => {
-					this.state = r.message;
-					this.remember_categories();
-					this.after_save(__("به چیدمان پیش‌فرض بازگشت."));
+					this.apply_state(r.message);
+					this.after_save(__("پیش‌فرض عمومی ذخیره شد."));
 				},
 			});
 		});
 	}
 
-	after_save(message) {
+	reset_personal() {
+		frappe.confirm(__("چیدمان شخصی شما پاک شود و چیدمان پیش‌فرض برگردد؟ چیدمان دیگران تغییر نمی‌کند."), () => {
+			frappe.call({
+				method: "smartprocee_erpnext_homepage.home_manager.api.reset_my_layout",
+				freeze: true,
+				callback: (r) => {
+					this.apply_state(r.message);
+					this.refresh_boot();
+					frappe.show_alert({ message: __("به چیدمان پیش‌فرض بازگشت."), indicator: "green" });
+				},
+			});
+		});
+	}
+
+	refresh_boot() {
 		try { localStorage.setItem("sp_home_updated", `${Date.now()}`); } catch (_) { /* Optional cross-tab signal. */ }
 		frappe.call({
 			method: "smartprocee_erpnext_homepage.home_manager.api.get_current_layout",
@@ -930,7 +1035,10 @@ class SPHomeManager {
 				window.sp_home_apply_layout?.();
 			},
 		});
-		this.render();
+	}
+
+	after_save(message) {
+		this.refresh_boot();
 		frappe.show_alert({ message: message || __("ذخیره شد."), indicator: "green" });
 	}
 }

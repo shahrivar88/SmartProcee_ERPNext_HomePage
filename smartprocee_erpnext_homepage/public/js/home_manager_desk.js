@@ -10,7 +10,6 @@
 
 	let observer, queued = false, applying = false;
 	const originals = new WeakMap();
-	const has_manager_role = () => (frappe.user_roles || frappe.boot?.user?.roles || []).includes("System Manager") || frappe.session?.user === "Administrator";
 	const clamp = (value, min, max, fallback) => Number.isFinite(Number(value)) && value !== null && value !== "" ? Math.max(min, Math.min(max, Math.trunc(Number(value)))) : fallback;
 	const observe = () => observer?.observe(document.body, { childList: true, subtree: true });
 
@@ -31,6 +30,8 @@
 		originals.set(el, {
 			html: box ? box.innerHTML : "",
 			href: el.getAttribute("href"),
+			target: el.getAttribute("target"),
+			rel: el.getAttribute("rel"),
 			caption: el.querySelector(":scope > .icon-caption")?.innerHTML,
 		});
 	};
@@ -47,11 +48,25 @@
 		}
 		if (original.href) el.setAttribute("href", original.href);
 		else el.removeAttribute("href");
+		set_target(el, original.target, original.rel);
 		const caption = el.querySelector(":scope > .icon-caption");
 		if (caption && original.caption !== undefined) caption.innerHTML = original.caption;
 		el.classList.remove("sp-home-icon", "sp-home-suppressed");
 		["spShape", "spSize", "spStyle"].forEach((key) => delete el.dataset[key]);
 		el.style.removeProperty("--sp-home-color");
+	};
+
+	const set_target = (el, target, rel) => {
+		if (target) el.setAttribute("target", target);
+		else el.removeAttribute("target");
+		if (rel) el.setAttribute("rel", rel);
+		else el.removeAttribute("rel");
+	};
+
+	const icon_href = (item) => {
+		const icons = frappe.boot?.desktop_icons || [];
+		const native = icons.find((icon) => icon.name === item.name) || icons.find((icon) => icon.label === item.label);
+		return window.sp_home_icon_href(item, native, frappe.utils?.get_route_for_icon?.bind(frappe.utils));
 	};
 
 	const native_folder_ids = () => new Set(
@@ -86,8 +101,8 @@
 		el.dataset.spStyle = layout.icon_style || "Solid";
 		paint_box(el.querySelector(":scope > .icon-container"), item, layout);
 		if (item.custom_link) el.setAttribute("href", item.custom_link);
-		el.target = "_blank";
-		el.rel = "noopener";
+		const external = window.sp_home_link_target(el.getAttribute("href"), window.location.origin);
+		set_target(el, external, external ? "noopener noreferrer" : "");
 		if (/^#[\da-f]{3}([\da-f]{3})?$/i.test(item.custom_color || "")) el.style.setProperty("--sp-home-color", item.custom_color);
 		else el.style.removeProperty("--sp-home-color");
 		const caption = el.querySelector(":scope > .icon-caption > .icon-title");
@@ -149,12 +164,7 @@
 		members.forEach((item) => {
 			const el = document.createElement("a");
 			el.className = "desktop-icon sp-home-icon";
-			const href = item.custom_link || item.link || (item.link_to ? `/app/${frappe.router.slug(item.link_to)}` : "");
-			if (href) {
-				el.href = href;
-				el.target = "_blank";
-				el.rel = "noopener";
-			}
+			el.href = icon_href(item);
 			const box = document.createElement("div");
 			box.className = "icon-container";
 			const caption = document.createElement("div");
@@ -173,14 +183,11 @@
 		const label = __(item.custom_label || item.label || item.name);
 		el.dataset.id = item.label || item.name;
 		el.dataset.spRuntime = "1";
-		el.href = item.custom_link || item.link || (item.link_to ? `/app/${frappe.router.slug(item.link_to)}` : "#");
-		el.target = "_blank";
-		el.rel = "noopener";
+		el.href = icon_href(item);
 		const box = el.querySelector(":scope > .icon-container");
 		if (box) box.replaceChildren();
 		const title = el.querySelector(":scope > .icon-caption > .icon-title");
 		if (title) title.textContent = label;
-		if (!item.link && !item.link_to && !item.custom_link) el.addEventListener("click", (event) => event.preventDefault());
 		return el;
 	};
 
@@ -210,7 +217,7 @@
 			if (!active) {
 				grid.querySelectorAll(".sp-home-icon").forEach(restore);
 				document.querySelectorAll(".sp-home-modal-grid").forEach((el) => el.classList.remove("sp-home-modal-grid"));
-				document.querySelectorAll(".sp-home-manage-btn, .sp-home-personal-btn").forEach((el) => el.remove());
+				document.querySelectorAll(".sp-home-gear-btn, .sp-home-manage-btn, .sp-home-personal-btn").forEach((el) => el.remove());
 				grid.style.removeProperty("display");
 				return true;
 			}
@@ -221,13 +228,15 @@
 			const items = new Map((layout.items || []).filter((item) => item.icon_type !== "Folder").flatMap((item) => [[item.name, item], [item.label, item]]));
 			const direct = new Map([...grid.querySelectorAll(":scope > a.desktop-icon")].map((el) => [el.dataset.id, el]));
 			const template = grid.querySelector(":scope > a.desktop-icon");
+			const drawn = (item) => direct.has(item.label) || direct.has(item.name);
+			const view = { ...layout, items: window.sp_home_effective_items(layout.items, icon_href, drawn) };
 			const claimed = new Set();
 			const groups = new Map((layout.categories || []).map((category) => [category, []]));
 			const place = (category, sequence, node) => {
 				if (!groups.has(category)) groups.set(category, []);
 				groups.get(category).push({ sequence: Number(sequence) || 0, node });
 			};
-			(layout.items || []).forEach((item) => {
+			view.items.forEach((item) => {
 				if (item.icon_type === "Folder" || folders.has(item.label) || folders.has(item.name) || item.folder) return;
 				const category = item.category || "عمومی";
 				let el = direct.get(item.label) || direct.get(item.name);
@@ -238,7 +247,7 @@
 				place(category, item.sequence, el);
 			});
 			(layout.folders || []).forEach((folder) => {
-				place(folder.category || "عمومی", folder.sequence, make_folder_button(folder, layout));
+				place(folder.category || "عمومی", folder.sequence, make_folder_button(folder, view));
 			});
 			direct.forEach((el) => {
 				if (!claimed.has(el) || folders.has(el.dataset.id)) {
@@ -265,11 +274,8 @@
 				modalGrid.querySelectorAll(":scope > .desktop-icon").forEach((el) => paint_icon(el, items.get(el.dataset.id) || { label: el.dataset.id }, layout));
 			});
 			const wrapper = container.closest(".desktop-wrapper") || container;
-			if (!document.querySelector(".sp-home-personal-btn")) {
-				$("<a class='sp-home-personal-btn' href='/app/home-personalize' title='چیدمان من' aria-label='چیدمان من'>چیدمان من</a>").appendTo(wrapper);
-			}
-			if (has_manager_role() && !document.querySelector(".sp-home-manage-btn")) {
-				$("<a class='sp-home-manage-btn' href='/app/home-manager' title='مدیریت صفحه اصلی' aria-label='مدیریت صفحه اصلی'><svg viewBox='0 0 24 24' aria-hidden='true'><path fill='currentColor' d='M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.1 7.1 0 0 0-1.62-.94L14.4 2.8a.48.48 0 0 0-.48-.4h-3.84a.48.48 0 0 0-.48.4l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.72 8.86a.48.48 0 0 0 .12.62l2.03 1.58c-.05.31-.08.64-.08.94s.03.63.08.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.22.38.31.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.23.24.4.48.4h3.84c.24 0 .44-.17.48-.4l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.02-1.58ZM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Z'/></svg></a>").appendTo(wrapper);
+			if (!document.querySelector(".sp-home-gear-btn")) {
+				$("<a class='sp-home-gear-btn' href='/app/home-personalize' title='تنظیم صفحه اصلی' aria-label='تنظیم صفحه اصلی'><svg viewBox='0 0 24 24' aria-hidden='true'><path fill='currentColor' d='M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.1 7.1 0 0 0-1.62-.94L14.4 2.8a.48.48 0 0 0-.48-.4h-3.84a.48.48 0 0 0-.48.4l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.72 8.86a.48.48 0 0 0 .12.62l2.03 1.58c-.05.31-.08.64-.08.94s.03.63.08.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.22.38.31.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.23.24.4.48.4h3.84c.24 0 .44-.17.48-.4l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.02-1.58ZM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Z'/></svg></a>").appendTo(wrapper);
 			}
 			return true;
 		} finally {
